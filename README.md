@@ -1,5 +1,17 @@
 # HOSHIZORA
 
+## 全天プラネタリウム
+
+`public/planetarium.html` に追加。左ボタンをホールドしてドラッグ、ホイールでズーム。タッチのスワイプとピンチ、方向キー・＋／−・Homeにも対応します。
+
+- XHIP由来の実在恒星118,216個（d3-celestial stars.14.json）を軽量な配列形式に変換して同梱。最大13.78等。全天のすべての恒星を網羅したカタログではありません。
+- WebGLのポイント描画。WebGLが使えない端末ではCanvas 2Dへフォールバック。
+- 等級の上限4〜14、星座線・星座名・明るい星名・天球グリッドの切り替え、全88星座への視点移動、星のクリックによるHIP番号・等級・名前の表示。
+- 星の座標はJ2000、色はB−Vの補間近似、点の半径と光のにじみは視認性のための表現。観察地・時刻・地平線・惑星・固有運動の計算は行いません。
+- 星の元データ：https://github.com/ofrohn/d3-celestial/blob/master/data/stars.14.json
+- 星名：https://github.com/ofrohn/d3-celestial/blob/master/data/starnames.json
+- 元星表：XHIP, Anderson & Francis (2012), VizieR V/137D。加工元ライセンスは `public/assets/d3-celestial-LICENSE.txt` に同梱。
+
 星座を季節や名前から探せる、日本語のサンプルサイトです。HTML・CSS・JavaScriptのみで動作します。
 
 ## 機能
