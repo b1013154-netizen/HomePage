@@ -1,23 +1,69 @@
-const seasons={spring:'春',summer:'夏',autumn:'秋',winter:'冬'};
-// Schematic illustrations for learning shapes; not astronomical coordinate data.
-const constellations=[
-{id:'cassiopeia',name:'カシオペヤ座',latin:'Cassiopeia',season:'autumn',months:'秋の宵',level:'はじめてにおすすめ',description:'夜空に浮かぶ、Wのかたち。北の空への道しるべ。',find:'北の空に、明るい5つの星がつくるW字を探しましょう。W字が回転したM字のように見えることもあります。日本の多くの地域では、季節を変えても観察できます。',story:'ギリシャ神話のエチオピア王妃を表す星座。近くには娘のアンドロメダや王のケフェウスの星座もあり、ひとつの物語が空に広がります。',points:[[35,75],[85,135],[140,55],[200,125],[255,65]],lines:[[0,1,2,3,4]]},
-{id:'pegasus',name:'ペガスス座',latin:'Pegasus',season:'autumn',months:'9〜11月ごろ',level:'秋の四辺形',description:'大きな四角形を目印に、翼を持つ天馬を探そう。',find:'秋の宵、空の高いところに大きな四角形を探しましょう。秋の四辺形の3つの星はペガスス座、残りの1つはアンドロメダ座に属しています。',story:'翼を持つ天馬ペガススの姿。秋の四辺形を出発点に、周囲のアンドロメダ座やうお座へと星をたどれます。',points:[[90,55],[200,65],[205,155],[85,145],[43,105],[22,120],[230,33],[262,44]],lines:[[0,1,2,3,0],[3,4,5],[1,6,7]]},
-{id:'andromeda',name:'アンドロメダ座',latin:'Andromeda',season:'autumn',months:'10〜11月ごろ',level:'銀河のある星座',description:'星の連なりの先に、はるかな銀河の世界がある。',find:'秋の四辺形の一角から、星が連なる方向をたどりましょう。暗い空ではアンドロメダ銀河を淡い光のしみとして探せますが、街明かりの中では難しくなります。',story:'ギリシャ神話の王女アンドロメダの姿。カシオペヤ座、ペルセウス座、ペガスス座などとともに、秋の空の物語をつくっています。',points:[[35,155],[95,120],[158,92],[225,50],[145,52],[220,137],[265,152]],lines:[[0,1,2,3],[2,4],[2,5,6]]},
-{id:'leo',name:'しし座',latin:'Leo',season:'spring',months:'3〜5月ごろ',level:'春の目印',description:'はてなマークを裏返した、獅子のたてがみ。',find:'春の宵、南の空で「？」を左右反転したような星の並びを探しましょう。ししの大鎌と呼ばれ、明るいレグルスが目印です。',story:'ギリシャ神話の英雄ヘルクレスに退治されたネメアの獅子と結びつけられる星座です。',points:[[55,155],[60,110],[35,75],[65,40],[110,48],[125,80],[200,100],[250,155]],lines:[[0,1,2,3,4,5,1],[1,6,7,0]]},
-{id:'virgo',name:'おとめ座',latin:'Virgo',season:'spring',months:'4〜6月ごろ',level:'スピカが目印',description:'青白い一等星スピカをたどる、春の星空散歩。',find:'北斗七星の柄のカーブを延ばしてアークトゥルスへ、さらに同じ向きに延ばすとスピカが見つかります。春の大曲線と呼ばれる探し方です。',story:'麦の穂を持つ女神の姿として描かれます。スピカの名前は、ラテン語の「穂」に由来します。',points:[[30,55],[88,85],[140,115],[210,85],[260,45],[130,170],[215,165]],lines:[[0,1,2,3,4],[2,5],[3,6]]},
-{id:'lyra',name:'こと座',latin:'Lyra',season:'summer',months:'7〜9月ごろ',level:'ベガが目印',description:'織姫星ベガが輝く、小さな竪琴の星座。',find:'夏の宵、頭の上近くで明るく輝くベガを探しましょう。近くの小さな平行四辺形も、こと座の特徴です。',story:'ベガは七夕の織姫星。ギリシャ神話では、音楽家オルフェウスの竪琴を表すともいわれます。',points:[[85,35],[125,85],[205,105],[180,170],[100,150]],lines:[[0,1,2,3,4,1]]},
-{id:'cygnus',name:'はくちょう座',latin:'Cygnus',season:'summer',months:'7〜9月ごろ',level:'大きな十字架',description:'天の川に翼を広げる、白鳥の大きな十字。',find:'夏の大三角のひとつ、デネブを目印に探しましょう。十字架のような形は北十字とも呼ばれ、長い軸が白鳥の首と胴体にあたります。',story:'天の川に沿って飛ぶ白鳥の姿。尾の星デネブは、ベガ・アルタイルとともに夏の大三角をつくります。',points:[[155,25],[145,90],[125,170],[55,65],[230,130]],lines:[[0,1,2],[3,1,4]]},
-{id:'scorpius',name:'さそり座',latin:'Scorpius',season:'summer',months:'6〜8月ごろ',level:'赤いアンタレス',description:'南の空に、赤い星と大きく曲がったしっぽ。',find:'夏の南の低い空を探しましょう。赤く輝くアンタレスから、S字を描くようにしっぽの星が連なります。南の地平線が開けた場所がおすすめです。',story:'赤いアンタレスはさそりの心臓。ギリシャ神話では、狩人オリオンとの物語でも知られる星座です。',points:[[45,40],[85,70],[110,105],[130,150],[180,175],[230,155],[250,115],[230,95],[60,100]],lines:[[0,1,2,3,4,5,6,7],[1,8]]},
-{id:'orion',name:'オリオン座',latin:'Orion',season:'winter',months:'12〜2月ごろ',level:'はじめてにおすすめ',description:'まっすぐ並ぶ三つ星。冬の夜空の案内役。',find:'冬の宵、南の空で等間隔に並ぶ三つ星を探しましょう。その周囲にある赤いベテルギウスと青白いリゲルも目印になります。',story:'ギリシャ神話の狩人オリオンの姿。三つ星の下には、オリオン大星雲のある小三つ星がぶら下がっています。',points:[[80,40],[210,55],[115,100],[145,108],[175,115],[70,175],[220,165],[140,20]],lines:[[0,1,4,6,5,2,0],[2,3,4],[0,7,1]]},
-{id:'taurus',name:'おうし座',latin:'Taurus',season:'winter',months:'12〜2月ごろ',level:'V字が目印',description:'赤い星を宿したV字と、宝石のようなすばる。',find:'オリオン座の三つ星を右上方向に延ばすと、赤いアルデバランとV字形の星の並びが見つかります。近くのプレアデス星団は「すばる」として親しまれています。',story:'角を持つ牡牛の顔を表すV字形の星の並びが特徴。すばるは肉眼でも複数の星が集まって見える美しい星団です。',points:[[35,25],[110,90],[145,145],[185,85],[260,45],[150,70]],lines:[[0,1,2,3,4],[1,5,3]]},
-{id:'gemini',name:'ふたご座',latin:'Gemini',season:'winter',months:'1〜3月ごろ',level:'ふたつの明るい星',description:'肩を並べるカストルとポルックス。冬の空の双子。',find:'オリオン座の左上方向で並ぶ、カストルとポルックスを目印にしましょう。そこからふたりの体にあたる星の列が延びています。',story:'ギリシャ神話の双子の兄弟に結びつけられる星座。ふたつの明るい星の色の違いにも注目してみてください。',points:[[105,35],[190,50],[100,95],[180,105],[60,170],[115,175],[165,180],[220,160]],lines:[[0,2,4],[2,5],[1,3,6],[3,7],[2,3]]},
-{id:'ursa-major',name:'おおぐま座',latin:'Ursa Major',season:'spring',months:'3〜5月ごろ',level:'北斗七星',description:'ひしゃくの形を見つけたら、大きな熊に出会える。',find:'北の空で、ひしゃくに似た北斗七星を探しましょう。北斗七星はおおぐま座の一部です。ひしゃくの先の2つの星を結んで延ばすと、北極星を探す手がかりになります。',story:'北の空に大きく横たわる熊の姿。北斗七星は、方角を知るための目印としても長く親しまれてきました。',points:[[25,60],[65,80],[105,110],[155,100],[220,65],[245,130],[175,155]],lines:[[0,1,2,3,4,5,6,3]]}
-];
-const cards=document.querySelector('#cards'),search=document.querySelector('#search'),dialog=document.querySelector('#detail');let activeSeason=['winter','winter','spring','spring','spring','summer','summer','summer','autumn','autumn','autumn','winter'][new Date().getMonth()];
-const summaries={spring:'春の夜風に、星をたどろう。',summer:'夏の夜に、天の川を想おう。',autumn:'秋の夜長に、星をつなごう。',winter:'冬の澄んだ空に、星を見つけよう。',all:'季節をめぐる、星空の旅へ。'};
-function diagram(c){return `<svg class="constellation" viewBox="0 0 290 200" role="img" aria-label="${c.name}の模式図">${c.lines.map(line=>`<polyline points="${line.map(i=>c.points[i].join(',')).join(' ')}"/>`).join('')}${c.points.map((p,i)=>`<circle cx="${p[0]}" cy="${p[1]}" r="${i%3===0?3.6:2.4}"/>`).join('')}</svg>`}
-function render(){const q=search.value.trim().toLowerCase();const list=constellations.filter(c=>(activeSeason==='all'||c.season===activeSeason)&&(!q||`${c.name} ${c.latin}`.toLowerCase().includes(q)));cards.innerHTML=list.map(c=>`<button class="card" data-id="${c.id}" aria-label="${c.name}の詳細を見る"><div class="card-art">${diagram(c)}<span class="art-caption">${c.latin.toUpperCase()}</span></div><div class="card-body"><div class="card-top"><h3>${c.name}</h3><span class="pill">${seasons[c.season]}の星座</span></div><p class="latin">${c.latin.toUpperCase()}</p><p class="description">${c.description}</p><div class="card-bottom"><span>◷ ${c.months}</span><span>星座を知る ↗</span></div></div></button>`).join('');document.querySelector('#empty').hidden=list.length>0;document.querySelector('#result-count').textContent=`${list.length} CONSTELLATIONS`;document.querySelectorAll('[data-season]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.season===activeSeason)));document.querySelector('#season-summary').textContent=summaries[activeSeason]}
-document.querySelectorAll('[data-season]').forEach(b=>b.addEventListener('click',()=>{activeSeason=b.dataset.season;render()}));search.addEventListener('input',render);document.querySelector('#reset').addEventListener('click',()=>{activeSeason='all';search.value='';render()});
-cards.addEventListener('click',e=>{const b=e.target.closest('[data-id]');if(!b)return;const c=constellations.find(c=>c.id===b.dataset.id);document.querySelector('#detail-content').innerHTML=`<p class="eyebrow gold">CONSTELLATION STORIES</p><div class="detail-art">${diagram(c)}</div><h2 id="detail-title">${c.name}</h2><p class="latin">${c.latin.toUpperCase()}</p><p class="detail-meta">${seasons[c.season]}の星座 · 見頃の目安：${c.months} · ${c.level}</p><h3>見つけ方</h3><p>${c.find}</p><h3>星座の物語</h3><p>${c.story}</p><p class="detail-note">図は模式図です。見える方向や時刻は場所・日付によって変わります。神話にはさまざまな伝承があります。</p>`;dialog.setAttribute('aria-labelledby','detail-title');dialog.showModal()});
-document.querySelector('.close').addEventListener('click',()=>dialog.close());dialog.addEventListener('click',e=>{if(e.target===dialog){const r=dialog.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)dialog.close()}});document.addEventListener('keydown',e=>{if(e.key==='/'&&!dialog.open&&!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)){e.preventDefault();search.focus();search.scrollIntoView({block:'center'})}});render();
+const regionNames = {north:'北天',equator:'天の赤道付近',south:'南天'};
+const seasonalLabels = {spring:'春',summer:'夏',autumn:'秋',winter:'冬'};
+// Preserve the longer guides for the original twelve entries, while taking all
+// names, diagrams, abbreviations and reference dates from the complete catalog.
+const constellations = constellationCatalog.map(entry => {
+  const featured = featuredConstellations.find(c => c.latin === entry.latin);
+  return {...entry, find:featured?.find, story:featured?.story};
+});
+const cards = document.querySelector('#cards');
+const search = document.querySelector('#search');
+const dialog = document.querySelector('#detail');
+const region = document.querySelector('#region');
+const sort = document.querySelector('#sort');
+let activeSeason = 'all';
+const normalize = value => value.normalize('NFKC').toLowerCase()
+  .replace(/[\u30a1-\u30f6]/g, c => String.fromCharCode(c.charCodeAt(0)-0x60))
+  .replace(/\s+/g,' ').trim();
+const summaries = {all:'世界の88星座へ、星空の旅に出よう。',spring:'春の夜風に、星をたどろう。',summer:'夏の夜に、天の川を想おう。',autumn:'秋の夜長に、星をつなごう。',winter:'冬の澄んだ空に、星を見つけよう。'};
+
+function diagram(c) {
+  return `<svg class="constellation" viewBox="0 0 290 200" role="img" aria-label="${c.name}の星座線・配置図">${c.lines.map(line => `<polyline points="${line.map(i => c.points[i].join(',')).join(' ')}"/>`).join('')}${c.points.map(p => `<circle cx="${p[0]}" cy="${p[1]}" r="2.4"/>`).join('')}</svg>`;
+}
+
+function render() {
+  const query = normalize(search.value);
+  const list = constellations.filter(c =>
+    (activeSeason === 'all' || c.season === activeSeason) &&
+    (region.value === 'all' || c.region === region.value) &&
+    (!query || normalize(`${c.name} ${c.meaning} ${c.latin} ${c.abbr}`).includes(query))
+  );
+  if (sort.value === 'latin') list.sort((a,b) => a.latin.localeCompare(b.latin,'en'));
+  if (sort.value === 'area') list.sort((a,b) => b.area-a.area);
+  cards.innerHTML = list.map(c => `<button class="card" data-id="${c.id}" aria-label="${c.name}の詳細を見る"><div class="card-art">${diagram(c)}<span class="art-caption">${c.abbr.toUpperCase()} · ${regionNames[c.region]}</span></div><div class="card-body"><div class="card-top"><h3>${c.name}</h3><span class="pill">${c.abbr}</span></div><p class="latin">${c.latin.toUpperCase()}</p><p class="description">${c.description}</p><div class="card-bottom"><span>${seasonalLabels[c.season]}の空 · ${regionNames[c.region]}</span><span>星座を知る ↗</span></div></div></button>`).join('');
+  document.querySelector('#empty').hidden = list.length > 0;
+  document.querySelector('#result-count').textContent = `${list.length} / 88 星座`;
+  document.querySelectorAll('[data-season]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.season === activeSeason)));
+  document.querySelector('#season-summary').textContent = summaries[activeSeason];
+}
+
+document.querySelectorAll('[data-season]').forEach(b => b.addEventListener('click', () => {activeSeason=b.dataset.season;render();}));
+search.addEventListener('input',render);
+region.addEventListener('change',render);
+sort.addEventListener('change',render);
+document.querySelector('#reset').addEventListener('click', () => {
+  activeSeason='all';search.value='';region.value='all';sort.value='japanese';render();
+});
+
+cards.addEventListener('click', event => {
+  const button = event.target.closest('[data-id]');
+  if (!button) return;
+  const c = constellations.find(c => c.id === button.dataset.id);
+  const find = c.find || `${c.name}の星の並びは上の配置図で確認できます。位置の目安は${c.transit}。これは東京で20時ごろに星座のおよその中心が子午線を通過する時期です。${c.region === 'south' ? '南天には、日本からは一部または全体を見ることができない星座もあります。観察地に対応した星図で確認してください。' : '実際の観察には、日付・時刻・観察地に対応した星図を併用しましょう。'}`;
+  document.querySelector('#detail-content').innerHTML = `<p class="eyebrow gold">THE 88 CONSTELLATIONS</p><div class="detail-art">${diagram(c)}</div><h2 id="detail-title">${c.name}</h2><p class="latin">${c.latin.toUpperCase()} · ${c.abbr}</p><p class="detail-meta">${regionNames[c.region]} · ${seasonalLabels[c.season]}の空</p><p>${c.description}</p><dl class="facts"><div><dt>正式な略符</dt><dd>${c.abbr}</dd></div><div><dt>面積</dt><dd>${c.area.toLocaleString('ja-JP',{minimumFractionDigits:3})} 平方度</dd></div><div><dt>学名の属格</dt><dd>${c.genitive}</dd></div><div><dt>20時の位置の目安</dt><dd>${c.transit}</dd></div></dl><h3>探すときのヒント</h3><p>${find}</p>${c.story ? `<h3>星座の物語</h3><p>${c.story}</p>` : ''}${c.abbr === 'Ser' ? '<p class="detail-note">へび座は頭部と尾部の2領域に分かれていますが、公式には1つの星座です。位置の目安：頭部は7月中旬、尾部は8月中旬。</p>' : ''}<p class="detail-note">位置の目安は国立天文台の一覧に基づきます。南天の星座も同じ時期の区分に含めていますが、日本から見えることを保証するものではありません。配置図は星の座標を投影して個別に拡大したものです。星座線の結び方は一例で、星の明るさと実際の空の方位は再現していません。</p><a class="detail-source" href="https://www.nao.ac.jp/new-info/constellation.html" target="_blank" rel="noopener noreferrer">国立天文台の公式一覧を見る ↗</a>`;
+  dialog.setAttribute('aria-labelledby','detail-title');
+  dialog.showModal();
+  dialog.scrollTop=0;
+});
+document.querySelector('.close').addEventListener('click', () => dialog.close());
+dialog.addEventListener('click', event => {
+  if (event.target !== dialog) return;
+  const r=dialog.getBoundingClientRect();
+  if(event.clientX<r.left || event.clientX>r.right || event.clientY<r.top || event.clientY>r.bottom) dialog.close();
+});
+document.addEventListener('keydown', event => {
+  if(event.key==='/' && !dialog.open && !['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)) {
+    event.preventDefault();search.focus();search.scrollIntoView({block:'center'});
+  }
+});
+render();
