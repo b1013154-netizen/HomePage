@@ -82,3 +82,12 @@ v1の保存先を継続使用し、旧データは保存時の内容を保持し
 - 通り名は世界観ごとの語彙、24種の叙述句、12種の接続表現、戦闘／非戦闘各16種の呼称、4つの文型を組み合わせて生成。
 - 内蔵image_genで制作したアニメ調ポートレート24種を自動／手動で選択。素材とプロンプトは `docs/character-art-v3.md` を参照。画像を毎回生成する機能ではなく、事前制作した画像の選択です。
 - v1/v2の保存内容は保持して表示し、再生成時のみv3ルールに移行。v3の保存・JSONにイラスト番号と素材参照を含む。
+
+## Chronicle Arena / v4
+- Character portraits: 48 (two 4x6 anime atlases). Existing portrait indices are preserved.
+- Saved character capacity: 200, retaining the existing localStorage key and v1-v3 objects. Storage quota errors are shown without deleting previous data.
+- /battle: saved-character duel (1v1) or boss battle (1-3 allies), four bosses and three difficulties.
+- Manual turn commands: attack, unique skill, heal, guard. Opponents use automatic actions. Automatic playback: normal (1 action/sec), double (2 actions/sec), results only; pause and retreat supported.
+- Battle uses a snapshot of saved characters. Stats are square-root scaled; equal-power option normalizes the total before scaling. Boss stats depend on party size and difficulty. No persistent HP or permanent loss.
+- Seeded battle randomness, 60-round limit, victory/defeat/draw/retreat epilogues, individual performance and recovery narratives, text download of logs and epilogues. Narratives are assembled locally from authored text and character settings; no external text AI calls.
+- New images generated with built-in image generation; see docs/character-art-v4.md.
