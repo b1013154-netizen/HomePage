@@ -1,6 +1,7 @@
 (() => {
   'use strict';
   const LORE = window.ForgeLore;
+  const CATALOGUE = window.ForgeCatalogue;
   const $ = id => document.getElementById(id);
   const STAT_NAMES = ['筋力', '耐久', '敏捷', '知性', '精神', '幸運'];
   const STAT_KEYS = ['STR', 'VIT', 'AGI', 'INT', 'WIL', 'LUK'];
@@ -9,6 +10,11 @@
     modern: { label:'現代・異能', jobs:['探偵','学生','研究者','救急隊員','格闘家','記者','料理人','配達員'], names:['ハル','アオイ','レン','ユズ','ナギ','ソラ','トウマ','ヒナ','リツ','マコト','シオン','イズミ'], surnames:['朝霧','白瀬','月島','七瀬','一ノ瀬','御影','青葉','風見'], places:['海沿いの小さな街','眠らない繁華街','閉鎖された研究都市','坂道の多い旧市街','郊外の団地'], objects:['壊れた懐中時計','古い録音機','差出人不明の写真','誰かとおそろいの鍵'], goals:['街で起こる奇妙な失踪事件を調べている','大切な人と交わした約束を果たそうとしている','自分だけが聞こえる声の正体を探している','日常に紛れた異変を記録している'] },
     scifi: { label:'SF・宇宙', jobs:['宇宙探偵','パイロット','エンジニア','衛生兵','傭兵','航海士','情報屋','惑星調査員'], names:['エコー','ノヴァ','アッシュ','リラ','ゼノ','イオ','キリ','アルト','ネム','テラ','リオン','セイル'], surnames:['ヴェクター','オービット','クロム','ヘリックス','レイヴン','アーク','ネビュラ','フラックス'], places:['外縁宙域の採掘コロニー','軌道上の巨大ステーション','地図にない移民惑星','廃棄された観測船','人工の夜明けを迎える都市'], objects:['読み取れないメモリチップ','旧式の航法端末','出所不明の金属片','途絶えた救難信号の記録'], goals:['消えた調査船の航路を追っている','故郷のコロニーを救う資源を探している','星間ネットワークの空白に隠れた真実を求めている','帰る場所のない旅人たちの居場所を作ろうとしている'] }
   };
+  const baseWorlds={...WORLDS};
+  for(const [id,config] of Object.entries(CATALOGUE.worlds)){
+    const base=baseWorlds[config.base],context=LORE.worlds[id];
+    WORLDS[id]={...base,label:config.label,names:config.names||base.names,surnames:config.surnames||base.surnames,jobs:CATALOGUE.jobs(id),places:context.places};
+  }
   const ROLES = [
     { id:'fighter', regex:/剣|騎士|戦士|格闘|傭兵|武士|侍|兵士|レスラー/, best:[0,1], title:['暁を切り拓く','砕けぬ誓いの','逆境を越える'], skills:[['突破の一撃','筋力を活かした一撃で、相手の守りを崩す。'],['守りの構え','危険を引き受け、次の行動まで味方をかばう。']] },
     { id:'mage', regex:/魔法|魔術|術師|研究|学者|科学|錬金/, best:[3,4], title:['未知を読み解く','境界を渡る','静かな叡智の'], skills:[['理の解析','相手や現象を観察し、弱点の手がかりを得る。'],['集束の波動','知性を力に変え、狙った対象へ放つ。']] },
@@ -47,7 +53,7 @@
       values=tokens.map(Number);
       if(values.reduce((a,b)=>a+b,0)>9999)throw Error('6つの数値の合計は9,999以下にしてください。');
     }
-    return {world:$('world').value,affiliation:$('affiliation').value,occupationType:$('occupation-type').value,mode,total,values,job:$('job').value.trim(),personality:$('personality').value.trim(),name:$('character-name').value.trim(),distribution:$('distribution').value};
+    return {world:$('world').value,affiliation:$('affiliation').value,occupationType:$('occupation-type').value,portraitChoice:$('portrait-choice').value,mode,total,values,job:$('job').value.trim(),personality:$('personality').value.trim(),name:$('character-name').value.trim(),distribution:$('distribution').value};
   }
   function allocate(input,role,rng){
     if(input.mode==='values'){
@@ -74,7 +80,7 @@
     const role=ROLES.find(r=>r.regex.test(job))||ROLES.at(-1),trait=TRAITS.find(t=>t.regex.test(personality));
     const stats=allocate(input,role,rng),top=stats.indexOf(Math.max(...stats)),low=stats.indexOf(Math.min(...stats));
     const first=choose(world.names,rng),last=choose(world.surnames,rng);
-    const name=input.name||(input.world==='modern'?last+' '+first:first+'・'+last);
+    const name=input.name||(['modern','japanese','wuxia'].includes(input.world)?last+' '+first:first+'・'+last);
     const habit=choose(trait.habit,rng),flaw=choose(trait.flaw,rng);
     const origin=choose(world.places,rng),object=choose(world.objects,rng),goal=choose(world.goals,rng);
     const strength=['重い荷を軽々と運ぶ力','粘り強く旅を続ける体力','一瞬の隙を逃さない身のこなし','複雑な問題をほどく洞察力','揺らぐ仲間を支える意志','不思議と好機を引き寄せる運'][top];
@@ -85,18 +91,22 @@
     return {schemaVersion:1,generatorVersion:'1.0',id:hash(JSON.stringify(input)+seed).toString(36),seed,input,name,job,personality,world:input.world,title:choose(role.title,rng)+job,stats:Object.fromEntries(STAT_KEYS.map((k,i)=>[k,stats[i]])),total:stats.reduce((a,b)=>a+b,0),story:`${origin}出身の${job}。「${personality}」という性格で、${habit}。${object}を携え、今は${goal}。`,strength,weakness,flaw,skills,quote:choose(trait.quote,rng),visual};
   }
   function generate(input,seed){
-    const rng=randomSource('forge-v2|'+JSON.stringify(input)+'|'+seed);
+    const rng=randomSource('forge-v3|'+JSON.stringify(input)+'|'+seed);
     const resolved={...input};
     if(!resolved.job && (resolved.occupationType==='civilian'||(resolved.occupationType!=='combat'&&['citizen','mob'].includes(resolved.affiliation))))resolved.job=choose(LORE.worlds[input.world].civil,rng);
-    if(!resolved.job && resolved.occupationType==='combat')resolved.job=choose(input.world==='fantasy'?['剣士','騎士','魔法使い','狩人']:input.world==='modern'?['格闘家','剣士','傭兵']:['傭兵','兵士','魔法使い'],rng);
+    if(!resolved.job && resolved.occupationType==='combat')resolved.job=choose(CATALOGUE.worlds[input.world].combat,rng);
     const c=generateBase(resolved,seed);
     const lore=LORE.create(input,c.job,rng);
-    c.input=input;c.lore=lore;c.generatorVersion='2.0';c.schemaVersion=2;
-    c.id=hash('2.0|'+JSON.stringify(input)+'|'+seed).toString(36);
+    c.input=input;c.lore=lore;c.generatorVersion='3.0';c.schemaVersion=3;
+    c.id=hash('3.0|'+JSON.stringify(input)+'|'+seed).toString(36);
     c.title=lore.title;c.quote=lore.catchphrase;c.flaw=lore.personalWeakness;
     c.story=`${lore.upbringing}。${lore.turningPoint}。今は${lore.motive}。`;
     c.skills=lore.skills;
     if(!lore.combat)c.visual.accessory=/技師|整備|工|鍛冶/.test(c.job)?'maker':'wanderer';
+    c.visual.artAsset='/assets/character-anime-atlas-v3.png';
+    c.visual.animeIndex=input.portraitChoice&&input.portraitChoice!=='auto'?Number(input.portraitChoice):CATALOGUE.portraitIndex(input.world,c.job,lore.combat,rng);
+    const ageRange=[9,17,21].includes(c.visual.animeIndex)?[40,67]:[5,7,13,19].includes(c.visual.animeIndex)?[28,49]:[18,34];
+    lore.age=ageRange[0]+Math.floor(rng()*(ageRange[1]-ageRange[0]+1));
     return c;
   }
   function loreSections(c){
@@ -106,6 +116,8 @@
     return `<section class="lore-section"><h4>UNIQUE SKILL / ユニークスキル</h4><div class="unique-skill"><strong>✦ ${escape(l.uniqueSkill.name)}</strong><p>${escape(l.uniqueSkill.description)}</p><small>制約・代償：${escape(l.uniqueSkill.cost)}</small></div><dl class="lore-facts">${item(l.specialtyLabel,l.specialty)}${item('所属',l.faction)}${item('年齢',l.age+'歳')}${item('性格の裏側',l.hiddenPersonality)}</dl></section><section class="lore-section"><h4>FIRST ENCOUNTER / 主人公との最初の出会い</h4><p>${escape(l.encounter)}</p><dl class="lore-facts">${item('関係の変化',l.relationship)}${item('行動の目的',l.motive)}</dl></section><details class="lore-details" open><summary>生い立ちと人物像</summary><dl class="lore-facts">${item('育った環境',l.family)}${item('生い立ち',l.upbringing)}${item('人生の転機',l.turningPoint)}${item('人としての強み',l.personalStrength)}${item('外見の特徴',l.appearance)}</dl></details><details class="lore-details"><summary>好き嫌い・秘密・イベントの種</summary><dl class="lore-facts">${item('好きなもの',l.likes)}${item('苦手なもの',l.dislikes)}${item('隠していること',l.secret)}${item('イベントの種',l.hook)}</dl></details>`;
   }
   function portrait(c){
+    if(Number.isInteger(c.visual.animeIndex)&&c.visual.animeIndex>=0&&c.visual.animeIndex<24)return animePortrait(c.visual.animeIndex);
+
     const {palette:[accent,coat,hair],skin,accessory,hair:style}=c.visual;
     const headwear=style===0?`<path d="M59 83Q49 38 85 37Q125 34 116 88L103 59 84 70 66 60Z" fill="${hair}"/>`:style===1?`<path d="M56 105L54 65Q59 35 87 38Q121 33 120 68L124 111 109 106 106 57 82 69 65 64 65 105Z" fill="${hair}"/>`:style===2?`<path d="M55 74L48 51 67 56 72 36 86 48 105 36 105 52 124 54 116 84 103 60 79 65 66 58Z" fill="${hair}"/>`:`<path d="M54 77Q48 40 83 38Q120 35 120 74L106 56 96 68 89 55 66 63 64 86Z" fill="${hair}"/>`;
     let gear='';
@@ -126,7 +138,7 @@
   function render(c){
     current=c;const values=STAT_KEYS.map(k=>c.stats[k]),max=Math.max(...values);
     $('character-card').style.setProperty('--accent',c.visual.palette[0]);
-    $('character-card').innerHTML=`<div class="character-topline"><span>CHARACTER FILE / ${escape(c.id.toUpperCase())}</span><span>${escape(WORLDS[c.world].label)}</span></div><div class="identity"><div class="portrait">${portrait(c)}<span class="portrait-caption">ORIGINAL CHARACTER</span></div><div><p class="character-kicker">${escape(c.title)}</p><h3>${escape(c.name)}</h3><p class="character-role">${escape(c.job)}</p><div class="character-tags"><span>${escape(c.lore?.affiliationLabel||'旧版キャラ')}</span><span>${escape(c.personality)}</span><span>${c.input.distribution==='role'?'職業らしい配分':'ランダム配分'}</span></div></div></div><div class="stats-block"><p class="section-caption">BASE ATTRIBUTES <b>TOTAL ${c.total}</b></p><div class="stats-layout"><dl class="stats-list">${values.map((n,i)=>`<div><div class="stat-head"><dt>${STAT_NAMES[i]}<small>${STAT_KEYS[i]}</small></dt><dd>${n}</dd></div><div class="stat-track" aria-hidden="true"><span style="width:${n/max*100}%"></span></div></div>`).join('')}</dl>${radar(values)}</div></div><div class="character-story"><h4>BACKGROUND / 物語のはじまり</h4><p>${escape(c.story)}</p><div class="skills">${c.skills.map(s=>`<div class="skill"><strong>${escape(s.name)}</strong><span>${escape(s.description)}</span></div>`).join('')}</div><h4>PERSONALITY / 強みと弱み</h4><p>得意なのは、${escape(c.strength)}。${escape(c.weakness)}<br>ただし、${escape(c.flaw)}。</p><h4>CATCHPHRASE / 口癖</h4><blockquote class="character-quote">${escape(c.quote)}</blockquote>${loreSections(c)}</div><div class="character-foot"><span>SEED / ${escape(c.seed)}</span><span>FORGE v${escape(c.generatorVersion)} · CREATIVE GAME ASSET</span></div>`;
+    $('character-card').innerHTML=`<div class="character-topline"><span>CHARACTER FILE / ${escape(c.id.toUpperCase())}</span><span>${escape(WORLDS[c.world].label)}</span></div><div class="identity"><div class="portrait">${portrait(c)}<span class="portrait-caption">${c.generatorVersion==='3.0'?'ANIME PORTRAIT':'ORIGINAL CHARACTER'}</span></div><div><p class="character-kicker">${escape(c.title)}</p><h3>${escape(c.name)}</h3><p class="character-role">${escape(c.job)}</p><div class="character-tags"><span>${escape(c.lore?.affiliationLabel||'旧版キャラ')}</span><span>${escape(c.personality)}</span><span>${c.input.distribution==='role'?'職業らしい配分':'ランダム配分'}</span></div></div></div><div class="stats-block"><p class="section-caption">BASE ATTRIBUTES <b>TOTAL ${c.total}</b></p><div class="stats-layout"><dl class="stats-list">${values.map((n,i)=>`<div><div class="stat-head"><dt>${STAT_NAMES[i]}<small>${STAT_KEYS[i]}</small></dt><dd>${n}</dd></div><div class="stat-track" aria-hidden="true"><span style="width:${n/max*100}%"></span></div></div>`).join('')}</dl>${radar(values)}</div></div><div class="character-story"><h4>BACKGROUND / 物語のはじまり</h4><p>${escape(c.story)}</p><div class="skills">${c.skills.map(s=>`<div class="skill"><strong>${escape(s.name)}</strong><span>${escape(s.description)}</span></div>`).join('')}</div><h4>PERSONALITY / 強みと弱み</h4><p>得意なのは、${escape(c.strength)}。${escape(c.weakness)}<br>ただし、${escape(c.flaw)}。</p><h4>CATCHPHRASE / 口癖</h4><blockquote class="character-quote">${escape(c.quote)}</blockquote>${loreSections(c)}</div><div class="character-foot"><span>SEED / ${escape(c.seed)}</span><span>FORGE v${escape(c.generatorVersion)} · CREATIVE GAME ASSET</span></div>`;
   }
   function baseTextFor(c){return `${c.name} — ${c.title}\n世界観：${WORLDS[c.world].label}\n職業：${c.job}\n性格：${c.personality}\n\n${Object.entries(c.stats).map(([key,n],i)=>`${STAT_NAMES[i]} (${key}): ${n}`).join('\n')}\n合計：${c.total}\n\n【背景】\n${c.story}\n\n【スキル】\n${c.skills.map(s=>s.name+'：'+s.description).join('\n')}\n\n【強みと弱み】\n得意：${c.strength}\n${c.weakness}\n弱点：${c.flaw}\n\n${c.quote}\n\nシード：${c.seed}\nCHARACTER FORGE v${c.generatorVersion}`;}
   function textFor(c){
@@ -146,14 +158,38 @@
     try{const input=readInput(),seed=$('seed').value.trim()||freshSeed();render(generate(input,seed));$('result-status').textContent='新しいキャラクターが生まれました';$('action-status').textContent='';return true;}catch(error){$('form-error').textContent=error.message;$('form-error').hidden=false;return false;}
   }
   function syncMode(){const total=document.querySelector('input[name=mode]:checked').value==='total';$('total-field').hidden=!total;$('values-field').hidden=total;$('total').disabled=!total;$('values').disabled=total;}
-  function syncJobs(){$('job-options').innerHTML=[...WORLDS[$('world').value].jobs,...LORE.worlds[$('world').value].civil].map(j=>`<option>${j}</option>`).join('');}
+  const portraitLabels=['銀髪の騎士','精悍な鎧の戦士','星飾りの魔術師','白髪の賢者','紅の侍','流浪の剣客','花飾りの祈祷師','翡翠の学者','笑顔のパン職人','温厚な店主','眼鏡の研究者','灰色の探偵','電脳のハッカー','宇宙のパイロット','真鍮の発明家','未来の研究員','黒薔薇の研究家','古城の審問官','白金の神託者','宵闇の貴人','荒野の斥候','歴戦の回収人','空の航海士','緑衣の旅人'];
+  function animePortrait(index){return `<span class="anime-art" role="img" aria-label="${escape(portraitLabels[index])}のアニメ調イラスト" style="--art-x:${index%4/3*100}%;--art-y:${Math.floor(index/4)/5*100}%"></span>`;}
+  function syncJobs(){
+    const config=CATALOGUE.worlds[$('world').value],filter=$('job-search').value.trim().normalize('NFKC').toLowerCase(),groups=[['戦闘・探索',config.combat],['専門・支援',config.specialist],['生活・社会',config.civil]];
+    let count=0;
+    $('job-preset').innerHTML='<option value="">候補を選ぶ / 自由入力</option>'+groups.map(([label,jobs])=>{
+      const matches=jobs.filter(j=>j.normalize('NFKC').toLowerCase().includes(filter));count+=matches.length;
+      return matches.length?`<optgroup label="${label}">${matches.map(j=>`<option value="${escape(j)}">${escape(j)}</option>`).join('')}</optgroup>`:'';
+    }).join('');
+    $('job-preset').value=[...$('job-preset').options].some(o=>o.value===$('job').value)?$('job').value:'';
+    $('job-count').textContent=count?`${count} / 30 職業 · ${config.label}`:'候補がありません。検索を変えるか、職業名を自由入力してください。';
+  }
+  function setupPortraits(){
+    $('portrait-choice').innerHTML='<option value="auto">世界観・職業に合わせてランダム</option>'+portraitLabels.map((label,i)=>`<option value="${i}">${String(i+1).padStart(2,'0')} / ${label}</option>`).join('');
+    $('portrait-grid').innerHTML=portraitLabels.map((label,i)=>`<button type="button" data-portrait="${i}" aria-label="${escape(label)}を選ぶ">${animePortrait(i)}<span class="portrait-option-label">${escape(label)}</span></button>`).join('');
+    const dialog=$('portrait-gallery');
+    $('open-portraits').addEventListener('click',()=>{document.querySelectorAll('[data-portrait]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.portrait===$('portrait-choice').value)));dialog.showModal();});
+    $('close-portraits').addEventListener('click',()=>dialog.close());
+    $('auto-portrait').addEventListener('click',()=>{$('portrait-choice').value='auto';dialog.close();});
+    $('portrait-grid').addEventListener('click',event=>{const b=event.target.closest('[data-portrait]');if(b){$('portrait-choice').value=b.dataset.portrait;dialog.close();}});
+    dialog.addEventListener('click',event=>{if(event.target!==dialog)return;const r=dialog.getBoundingClientRect();if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)dialog.close();});
+  }
   $('character-form').addEventListener('submit',event=>{event.preventDefault();if(generateFromForm()&&matchMedia('(max-width:760px)').matches)$('result-title').scrollIntoView({behavior:matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth',block:'start'});});
   document.querySelectorAll('input[name=mode]').forEach(r=>r.addEventListener('change',syncMode));
-  $('world').addEventListener('change',syncJobs);
+  $('world').addEventListener('change',()=>{$('job-search').value='';$('job').value='';syncJobs();});
+  $('job-search').addEventListener('input',syncJobs);
+  $('job-preset').addEventListener('change',()=>{if($('job-preset').value)$('job').value=$('job-preset').value;});
+  $('job').addEventListener('input',syncJobs);
   $('random-input').addEventListener('click',()=>{
-    const rng=randomSource(freshSeed()),world=choose(Object.keys(WORLDS),rng);$('world').value=world;syncJobs();
+    const rng=randomSource(freshSeed()),world=choose(Object.keys(WORLDS),rng);$('world').value=world;$('job-search').value='';syncJobs();
     $('affiliation').value=choose(Object.keys(LORE.affiliations),rng);$('occupation-type').value='auto';$('job').value=choose(['citizen','mob'].includes($('affiliation').value)?LORE.worlds[world].civil:WORLDS[world].jobs,rng);$('personality').value=choose(LORE.personalities,rng);
-    $('total').value=String(6+Math.floor(rng()*9994));$('values').value=Array.from({length:6},()=>10+Math.floor(rng()*91)).join(', ');$('character-name').value='';$('seed').value='';$('form-error').hidden=true;$('action-status').textContent='入力をランダムに設定しました。「キャラクターを生成」で作成できます。';
+    $('total').value=String(6+Math.floor(rng()*9994));$('values').value=Array.from({length:6},()=>10+Math.floor(rng()*91)).join(', ');$('character-name').value='';$('portrait-choice').value='auto';$('seed').value='';syncJobs();$('form-error').hidden=true;$('action-status').textContent='入力をランダムに設定しました。「キャラクターを生成」で作成できます。';
   });
   $('save-character').addEventListener('click',()=>{
     if(saved.some(c=>c.id===current.id&&c.seed===current.seed)){$('action-status').textContent='このキャラクターは保存済みです。';return;}
@@ -169,7 +205,7 @@
   });
   $('saved-characters').addEventListener('click',event=>{
     const open=event.target.closest('[data-open]'),remove=event.target.closest('[data-delete]');
-    if(open){const c=saved[Number(open.dataset.open)];render(c);const input=c.input;$('world').value=input.world;syncJobs();$('affiliation').value=input.affiliation||'ally';$('occupation-type').value=input.occupationType||'auto';document.querySelector(`input[name=mode][value="${input.mode}"]`).checked=true;syncMode();$('total').value=input.total??300;$('values').value=input.values?.join(', ')||'80, 65, 55, 45, 35, 20';$('job').value=input.job;$('personality').value=input.personality;$('character-name').value=input.name;$('distribution').value=input.distribution;$('seed').value=c.seed;$('form-error').hidden=true;$('result-status').textContent='保存したキャラクターを表示中';$('action-status').textContent=c.generatorVersion==='1.0'?'旧版の保存内容を表示しています。再生成すると、新しい生成ルールで設定が変わります。':'入力条件も復元しました。シードを空欄にすると新しい結果を生成できます。';$('result-title').scrollIntoView({block:'start',behavior:'auto'});}
+    if(open){const c=saved[Number(open.dataset.open)];render(c);const input=c.input;$('world').value=input.world;$('job-search').value='';syncJobs();$('affiliation').value=input.affiliation||'ally';$('occupation-type').value=input.occupationType||'auto';$('portrait-choice').value=input.portraitChoice||'auto';document.querySelector(`input[name=mode][value="${input.mode}"]`).checked=true;syncMode();$('total').value=input.total??300;$('values').value=input.values?.join(', ')||'80, 65, 55, 45, 35, 20';$('job').value=input.job;$('personality').value=input.personality;$('character-name').value=input.name;$('distribution').value=input.distribution;$('seed').value=c.seed;syncJobs();$('form-error').hidden=true;$('result-status').textContent='保存したキャラクターを表示中';$('action-status').textContent=c.generatorVersion!=='3.0'?'旧版の保存内容を表示しています。再生成すると、新しい生成ルールで設定が変わります。':'入力条件も復元しました。シードを空欄にすると新しい結果を生成できます。';$('result-title').scrollIntoView({block:'start',behavior:'auto'});}
     if(remove){const index=Number(remove.dataset.delete),name=saved[index].name;if(persist(saved.filter((_,i)=>i!==index)))$('action-status').textContent=`${name}を保存リストから外しました。`;}
   });
   function validLore(c){
@@ -177,9 +213,11 @@
     return l&&Object.hasOwn(LORE.affiliations,l.affiliation)&&['ally','enemy','mob','citizen','random'].includes(c.input.affiliation)&&['auto','combat','civilian'].includes(c.input.occupationType)&&typeof l.combat==='boolean'&&Number.isInteger(l.age)&&l.age>=18&&l.age<=75&&['affiliationLabel','title','faction','hiddenPersonality','family','upbringing','turningPoint','motive','encounter','relationship','specialtyLabel','specialty','personalStrength','personalWeakness','catchphrase','secret','likes','dislikes','appearance','hook'].every(k=>typeof l[k]==='string')&&l.uniqueSkill&&['name','description','cost'].every(k=>typeof l.uniqueSkill[k]==='string');
   }
   function validSaved(c){
-    return ['1.0','2.0'].includes(c?.generatorVersion)&&Object.hasOwn(WORLDS,c.world)&&c.input&&c.input.world===c.world&&['total','values'].includes(c.input.mode)&&['random','role'].includes(c.input.distribution)&&['job','personality','name'].every(k=>typeof c.input[k]==='string')&&(c.input.mode==='total'?Number.isInteger(c.input.total)&&c.input.total>=6&&c.input.total<=9999:Array.isArray(c.input.values)&&c.input.values.length===6&&c.input.values.every(n=>Number.isInteger(n)&&n>=1&&n<=9999))&&c.visual&&Array.isArray(c.visual.palette)&&c.visual.palette.length===3&&[...c.visual.palette,c.visual.skin].every(v=>typeof v==='string'&&/^#[0-9a-f]{6}$/i.test(v))&&Array.isArray(c.skills)&&c.skills.length===2&&c.skills.every(s=>typeof s.name==='string'&&typeof s.description==='string')&&STAT_KEYS.every(k=>Number.isInteger(c.stats?.[k])&&c.stats[k]>=1&&c.stats[k]<=9999)&&c.total<=9999&&c.total===STAT_KEYS.reduce((sum,k)=>sum+c.stats[k],0)&&['id','seed','name','job','personality','title','story','strength','weakness','flaw','quote'].every(k=>typeof c[k]==='string')&&(c.generatorVersion==='1.0'||validLore(c));
+    return ['1.0','2.0','3.0'].includes(c?.generatorVersion)&&Object.hasOwn(WORLDS,c.world)&&c.input&&c.input.world===c.world&&['total','values'].includes(c.input.mode)&&['random','role'].includes(c.input.distribution)&&['job','personality','name'].every(k=>typeof c.input[k]==='string')&&(c.input.mode==='total'?Number.isInteger(c.input.total)&&c.input.total>=6&&c.input.total<=9999:Array.isArray(c.input.values)&&c.input.values.length===6&&c.input.values.every(n=>Number.isInteger(n)&&n>=1&&n<=9999))&&c.visual&&Array.isArray(c.visual.palette)&&c.visual.palette.length===3&&[...c.visual.palette,c.visual.skin].every(v=>typeof v==='string'&&/^#[0-9a-f]{6}$/i.test(v))&&Array.isArray(c.skills)&&c.skills.length===2&&c.skills.every(s=>typeof s.name==='string'&&typeof s.description==='string')&&STAT_KEYS.every(k=>Number.isInteger(c.stats?.[k])&&c.stats[k]>=1&&c.stats[k]<=9999)&&c.total<=9999&&c.total===STAT_KEYS.reduce((sum,k)=>sum+c.stats[k],0)&&['id','seed','name','job','personality','title','story','strength','weakness','flaw','quote'].every(k=>typeof c[k]==='string')&&(c.generatorVersion==='1.0'||validLore(c))&&(c.generatorVersion!=='3.0'||((c.input.portraitChoice==='auto'||/^(?:[0-9]|1[0-9]|2[0-3])$/.test(c.input.portraitChoice))&&Number.isInteger(c.visual.animeIndex)&&c.visual.animeIndex>=0&&c.visual.animeIndex<24));
   }
   try{const data=JSON.parse(localStorage.getItem(STORAGE)||'[]');if(Array.isArray(data))saved=data.filter(validSaved).slice(0,20);}catch{}
   $('personality-options').innerHTML=LORE.personalities.map(p=>`<option>${escape(p)}</option>`).join('');
-  syncMode();syncJobs();renderSaved();render(generate(readInput(),'first-adventure'));
+  $('world').innerHTML=Object.values(CATALOGUE.worlds).map(w=>`<option value="${w.id}">${w.label}</option>`).join('');
+  $('world-count').textContent='12の世界観 / 職業候補は各30種類';
+  setupPortraits();syncMode();syncJobs();renderSaved();render(generate(readInput(),'first-adventure'));
 })();
