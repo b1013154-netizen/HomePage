@@ -1,3 +1,7 @@
+# ホームページの遊び場
+
+トップページ `/` から、HOSHIZORA星座図鑑 `/hoshizora` と全天プラネタリウム `/planetarium` を開けます。全ページに共通のドロワーメニューを配置。旧トップページの `#explore`・`#guide`・`#about` リンクはHOSHIZORAへ引き継ぎます。ページを増やすときは `public/playground-nav.js` の pages とトップページのカードを追加してください。
+
 # HOSHIZORA
 
 ## 全天プラネタリウム
