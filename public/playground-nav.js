@@ -2,6 +2,7 @@
   const path = location.pathname.replace(/\.html$/, '').replace(/\/$/, '').replace(/^\/index$/, '') || '/';
   const pages = [
     { url: '/', title: 'ホームページの遊び場', sub: 'すべての遊び場への入り口', icon: '⌂' },
+    { url: '/character', title: 'CHARACTER FORGE', sub: 'ゲーム用キャラメーカー', icon: '⚄' },
     { url: '/hoshizora', title: 'HOSHIZORA', sub: '世界の88星座をめぐる図鑑', icon: '✧' },
     { url: '/planetarium', title: '全天プラネタリウム', sub: 'HOSHIZORA · 118,216個の星を探検', icon: '◌' }
   ];
