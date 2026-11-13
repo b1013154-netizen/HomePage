@@ -1,0 +1,42 @@
+(()=>{
+'use strict';
+const $=id=>document.getElementById(id),ink=$('ink'),pen=ink.getContext('2d',{willReadFrequently:true}),back=$('back').getContext('2d'),card=$('card'),g=card.getContext('2d'),W=720,H=540;
+const groups=[
+ ['星の海','星降る夜|流星群|薄明の銀河|青い月夜|金色の星雲','182549/60699e|48234e/b05b81|563e76/f9ae92|223961/50a9bc|514052/e8b25e'],
+ ['海辺','白波の浜|珊瑚の海|夕陽の入江|氷の海峡|真珠の浅瀬','84cee5/e9efd2|65c3c2/f1a58d|f6b884/aa6890|aac6e4/e2f5f9|b9dbcb/f8efd9'],
+ ['山脈','黎明の峰|雪山の稜線|紅葉の峠|紫の峡谷|砂岩の台地','eda787/866f92|afcee7/e6f0f3|d4ac64/aa6959|a396cd/685e90|e4b882/b48365'],
+ ['森','木漏れ日の森|霧の針葉樹林|深緑の谷|月影の森|冬の白樺林','f2d995/77a781|c1d6ca/819f9b|9bc999/447b6a|787baf/43476e|dce7e7/93aeb1'],
+ ['街','夕暮れの街|ネオン都市|雨の港町|砂漠の都|朝焼けの王都','eda179/886582|7655aa/314478|94b0bd/58738c|e7c18e/aa8465|f1c2ac/c99cad'],
+ ['結晶','水晶洞窟|翡翠の鉱脈|琥珀の回廊|紅玉の聖堂|氷晶の回廊','aea5dd/685a9a|89c9b7/45887a|ebc584/ae854b|dca0a9/965570|afd8e5/638fae']
+];
+const scenes=[];groups.forEach(([group,names,colors],type)=>{const opt=document.createElement('optgroup');opt.label=group;names.split('|').forEach((name,i)=>{const pair=colors.split('|')[i].split('/').map(s=>'#'+s),v=scenes.length;scenes.push({name,type,pair});opt.append(new Option(name,v));});$('scene').append(opt);});
+function paint(){back.clearRect(0,0,W,H);$('scene').disabled=!$('has-bg').checked;if(!$('has-bg').checked)return;
+ const id=Number($('scene').value),{type,pair}=scenes[id],grad=back.createLinearGradient(0,0,W/2,H);grad.addColorStop(0,pair[0]);grad.addColorStop(1,pair[1]);back.fillStyle=grad;back.fillRect(0,0,W,H);
+ let seed=id+17;const r=()=>((seed=Math.imul(seed,1664525)+1013904223>>>0)/4294967296),poly=pts=>{back.beginPath();pts.forEach(([x,y],i)=>i?back.lineTo(x,y):back.moveTo(x,y));back.closePath();back.fill();};
+ back.save();
+ if(type===0){back.fillStyle='#ffefd2';for(let i=0;i<105;i++){let x=r()*W,y=r()*H,z=1+r()*3;back.globalAlpha=.35+r()*.65;poly([[x,y-z*2],[x+z/2,y-z/2],[x+z*2,y],[x+z/2,y+z/2],[x,y+z*2],[x-z/2,y+z/2],[x-z*2,y],[x-z/2,y-z/2]]);}}
+ if(type===1){for(let j=0;j<8;j++){back.fillStyle=j%2?'#fcf2d954':'#31779545';back.beginPath();back.moveTo(0,H);for(let x=0;x<=W;x+=4)back.lineTo(x,200+j*45+Math.sin(x/(45+id)+j+id)*18);back.lineTo(W,H);back.fill();}}
+ if(type===2){for(let j=0;j<3;j++){back.fillStyle=['#ffffff61','#57496152','#302c4666'][j];let pts=[[0,H]];for(let x=-90;x<W+110;x+=75)pts.push([x,150+j*105+r()*110]);poly([...pts,[W,H]]);}}
+ if(type===3){for(let j=0;j<60;j++){let x=r()*W,y=H*.48+j/60*H*.52,z=30+r()*100;back.fillStyle=j<30?'#ffffff39':'#173c4054';poly([[x,y-z],[x+z*.35,y],[x-z*.35,y]]);}}
+ if(type===4){for(let row=0;row<2;row++){let x=-12;while(x<W){let w=35+r()*52,h=45+r()*180+row*20,y=H-h-(1-row)*80;back.fillStyle=row?'#24294299':'#4a496254';back.fillRect(x,y,w,H-y);back.fillStyle='#ffe1aa9c';for(let yy=y+12;yy<H;yy+=20)for(let xx=x+8;xx<x+w-6;xx+=14)if(r()>.48)back.fillRect(xx,yy,5,7);x+=w+3;}}}
+ if(type===5){for(let j=0;j<35;j++){let x=r()*W,y=r()*H,z=12+r()*64;back.fillStyle='#ffffff35';poly([[x,y-z],[x+z*.4,y],[x,y+z],[x-z*.4,y]]);back.fillStyle='#352f5e29';poly([[x,y-z],[x+z*.4,y],[x,y+z]]);}}
+ back.restore();}
+$('scene').onchange=paint;$('has-bg').onchange=paint;paint();
+let history=[],active=null,erase=false,last;
+function point(e){const b=ink.getBoundingClientRect();return [(e.clientX-b.left)*W/b.width,(e.clientY-b.top)*H/b.height];}
+ink.onpointerdown=e=>{if(active!==null||e.button!==0)return;history.push(pen.getImageData(0,0,W,H));if(history.length>16)history.shift();$('undo').disabled=false;active=e.pointerId;ink.setPointerCapture(active);last=point(e);pen.globalCompositeOperation=erase?'destination-out':'source-over';pen.fillStyle=pen.strokeStyle=$('color').value;pen.lineWidth=+$('width').value;pen.lineCap=pen.lineJoin='round';pen.beginPath();pen.arc(...last,pen.lineWidth/2,0,2*Math.PI);pen.fill();};
+ink.onpointermove=e=>{if(active!==e.pointerId)return;const p=point(e);pen.beginPath();pen.moveTo(...last);pen.lineTo(...p);pen.stroke();last=p;};
+ink.onpointerup=ink.onpointercancel=ink.onlostpointercapture=e=>{if(active===e.pointerId)active=null;};
+$('eraser').onclick=()=>{$('eraser').setAttribute('aria-pressed',String(erase=!erase));};$('undo').onclick=()=>{if(history.length&&active===null)pen.putImageData(history.pop(),0,0);$('undo').disabled=!history.length;};
+const ranks=[['コモン','#dfd9c6'],['アンコモン','#95daba'],['レア','#9acded'],['スーパー レア','#c7a6e5'],['レジェンド','#f0bf68']],effects=[['先制','最初の行動が1拍早まる。'],['鉄壁','受けるダメージを2軽減する。'],['吸収','攻撃のたびにHPを2回復する。'],['追撃','3回目の攻撃ごとに4ダメージを追加。'],['逆転','HPが半分以下なら攻撃力が3上がる。'],['再生','自分の行動後、HPを3回復する。']];
+const rand=n=>Math.floor(Math.random()*n),pick=a=>a[rand(a.length)],names=['星の','草原の','虹の','暁の','夢見る','小さな'],tails=['落書き竜','守り手','旅人','使い魔','騎士','冒険者'];
+function roll(name){let v=rand(100),rank=v<45?0:v<74?1:v<91?2:v<98?3:4,cost=1+rand(6),pool=7+cost*2+rank*2,atk=3+rand(pool-4);return {name,rank,cost,atk,def:pool-atk,e:rand(effects.length)};}
+let current=null;
+function line(t,x,y,size,color='#282538',max=650){g.fillStyle=color;g.font='bold '+size+'px system-ui,sans-serif';g.fillText(t,x,y,max);}
+function render(c){let [rarity,accent]=ranks[c.rank];g.fillStyle='#292638';g.fillRect(0,0,720,980);g.fillStyle=accent;g.fillRect(12,12,696,956);g.fillStyle='#fffaf0';g.fillRect(25,25,670,930);line('INK CLUB    /    '+rarity,46,68,26);line(c.name,46,133,48);g.fillStyle='#fff';g.fillRect(40,160,640,480);g.drawImage($('back'),40,160,640,480);g.drawImage(ink,40,160,640,480);g.strokeStyle='#292638';g.lineWidth=3;g.strokeRect(40,160,640,480);line('COST  '+c.cost+'      ATK  '+c.atk+'      DEF  '+c.def,45,714,37);g.fillStyle=accent;g.fillRect(42,744,636,5);line('✦ '+effects[c.e][0],45,815,39);line(effects[c.e][1],45,874,28);line('DRAW & DUEL     /     ORIGINAL CARD',45,931,18);const desc=rarity+' ／ コスト '+c.cost+'・攻撃力 '+c.atk+'・防御力 '+c.def+' ／ '+effects[c.e].join('：');card.setAttribute('aria-label',c.name+'：'+desc);$('description').textContent=desc;}
+$('make').onclick=()=>{const pixels=pen.getImageData(0,0,W,H).data;let drawn=false;for(let i=3;i<pixels.length;i+=4)if(pixels[i]){drawn=true;break;}if(!drawn){$('notice').textContent='まずキャンバスに絵を描いてください。';return;}current=roll($('name').value.trim()||pick(names)+pick(tails));render(current);$('placeholder').hidden=true;$('output').hidden=false;$('log').textContent='';$('notice').textContent='「'+current.name+'」が生まれました！';if(matchMedia('(max-width:760px)').matches)$('output').scrollIntoView({block:'start'});};
+$('download').onclick=()=>card.toBlob(blob=>{if(!blob)return;const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='ink-club-card.png';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});
+$('duel').onclick=()=>{const cpu=roll(pick(['インクゴーレム','クレヨンナイト','折り紙の竜','消しゴムおばけ'])),units=[current,cpu].map(c=>({c,hp:24+c.def,max:24+c.def,next:c.cost-(c.e===0?1:0),moves:0})),logs=[];let win=null;
+for(let t=0;t<100;t++){let i=units[0].next===units[1].next?rand(2):Number(units[1].next<units[0].next),a=units[i],b=units[1-i];a.moves++;const hit=Math.max(1,a.c.atk+rand(4)-Math.floor(b.c.def/3)-(b.c.e===1?2:0)+(a.c.e===3&&a.moves%3===0?4:0)+(a.c.e===4&&a.hp<=a.max/2?3:0));b.hp=Math.max(0,b.hp-hit);a.hp=Math.min(a.max,a.hp+(a.c.e===2?2:a.c.e===5?3:0));logs.push(a.c.name+' → '+hit+'ダメージ（相手HP '+b.hp+'）');if(!b.hp){win=i;break;}a.next+=3+a.c.cost;}
+$('log').textContent=(win===null?'引き分け':win===0?'勝利！':'惜しくも敗北')+'　対 '+cpu.name+'（'+effects[cpu.e][0]+'）\n'+logs.slice(-4).join('\n')+'\nコストが低いほど、次の攻撃までの間隔が短くなります。';};
+})();
