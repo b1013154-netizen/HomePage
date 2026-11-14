@@ -10,9 +10,18 @@ $('tracks').replaceChildren(...song.lanes.map((z,j)=>{let b=document.createEleme
 $('lock').textContent=locked?'◆ ロック解除':'◇ 選んだ位置から4段をロック';$('lockstate').textContent=locked?'同じ時間帯を全パートで保持':'';$('lock').disabled=l.steps.length<4&&!locked;$('left').disabled=sel===0||locked;$('right').disabled=sel===l.steps.length-1||locked;$('add').disabled=locked||l.steps.length>=160;$('remove').disabled=locked||l.steps.length<=1;$('pluslane').disabled=locked||song.lanes.length>=4;$('droplane').disabled=locked||song.lanes.length<2;$('genre').disabled=locked;
 $('score').textContent=song.lanes.length+' TRACKS　/　'+song.n+' BEATS　/　'+song.tempo+' BPM　/　'+StairGroove.meters[song.meter||0].join('/');$('density').selectedIndex=l.density||0;$('undo').disabled=!history.length;$('hook').disabled=l.steps.length<4||song.n>=48;$('style-note').textContent=E.patterns[song.genre][4]+(song.sections?'　構成：'+song.sections.map(x=>x.name).join(' → '):'')+(song.chorus?'　Aメロ → サビ：'+(song.chorus+1)+'拍目から':'');paintCurve();draw(song,li,sel);syncExtras();}
 function stop(t){run++;cancelAnimationFrame(raf);if(source){source.onended=null;try{source.stop();}catch{}source.disconnect();source=null;}$('stop').disabled=true;$('play').disabled=false;draw(song,li,sel);if(t)msg(t);}
-async function master(){if(vocalSettings().on&&vocalWarning())throw Error(vocalWarning());let k=JSON.stringify(song);if(k!==key){let score=E.compose(song);let data=E.render(score);const vocals=StairSinger.phrase(score,song);if(vocals.length)await KanaVoice.mix(data,vocals,song.singing.voice);score.wave=data;const fade=Math.min(4410,data.length);for(let i=0;i<fade;i++)data[data.length-fade+i]*=1-i/fade;cached={score,data};key=k;}return cached;}
-async function play(){stop();let token=run;try{ctx=ctx||new AudioContext();await ctx.resume();if(token!==run)return;let {data,score}=await master();if(token!==run)return;let buf=ctx.createBuffer(1,data.length,S.rate);buf.copyToChannel(data,0);source=ctx.createBufferSource();source.buffer=buf;source.connect(ctx.destination);let start=ctx.currentTime+.05;source.start(start);$('play').disabled=true;$('stop').disabled=false;msg(E.styles[song.genre][0]+'　/　合奏中');let prev=-1;function tick(){if(token!==run)return;let t=ctx.currentTime-start;if(t-prev>.024){draw(song,li,sel,t,score);prev=t;}raf=requestAnimationFrame(tick);}tick();source.onended=()=>{if(token!==run)return;stop('演奏が終わりました。');if($('loop').checked)play();};}catch(e){stop(vocalWarning()&&vocalSettings().on?vocalWarning():'再生できませんでした。端末の音声設定をご確認ください。');}}
-$('play').onclick=play;$('stop').onclick=()=>stop('停止しました。');
+async function master(){if(vocalSettings().on&&vocalWarning())throw Error(vocalWarning());let k=JSON.stringify(song);if(k!==key){let score=E.compose(song);let data=E.render(score);const vocals=StairSinger.phrase(score,song);let stem=null;
+if(song.singing.on){
+ if(!vocals.length)throw Error('歌える音符がありません。メロディーなどの有音程パートを追加し、ミュートを解除してください。');
+ stem=new Float32Array(data.length);await KanaVoice.mix(stem,vocals,song.singing.voice);
+ let peak=0;for(const sample of stem)peak=Math.max(peak,Math.abs(sample));
+ if(!(peak>.01))throw Error('歌声を生成できませんでした。歌詞と音符を確認してください。');
+ const gain=(song.singing.level??110)/100;
+ for(let i=0;i<data.length;i++)data[i]=Math.tanh(data[i]*.53+stem[i]*gain);
+}
+score.wave=data;const fade=Math.min(4410,data.length);for(let i=0;i<fade;i++)data[data.length-fade+i]*=1-i/fade;cached={score,data,stem};key=k;}return cached;}
+async function play(solo=false){stop();let token=run;try{ctx=ctx||new AudioContext();await ctx.resume();if(token!==run)return;let {data,score,stem}=await master();if(solo)data=stem.map(sample=>Math.tanh(sample*(song.singing.level??110)/100));if(token!==run)return;let buf=ctx.createBuffer(1,data.length,S.rate);buf.copyToChannel(data,0);source=ctx.createBufferSource();source.buffer=buf;source.connect(ctx.destination);let start=ctx.currentTime+.05;source.start(start);$('play').disabled=true;$('stop').disabled=false;msg(solo?'歌声だけ試聴中':E.styles[song.genre][0]+'　/　合奏中');let prev=-1;function tick(){if(token!==run)return;let t=ctx.currentTime-start;if(t-prev>.024){draw(song,li,sel,t,score);prev=t;}raf=requestAnimationFrame(tick);}tick();source.onended=()=>{if(token!==run)return;stop('演奏が終わりました。');if($('loop').checked&&!solo)play();};}catch(e){stop(e.message||'再生できませんでした。');}}
+$('play').onclick=()=>play();$('stop').onclick=()=>stop('停止しました。');
 const history=[];function remember(){history.push(structuredClone(song));if(history.length>20)history.shift();}function change(fn){stop();remember();song.oldArrangement=false;song.legacy=false;fn();sync();} $('undo').onclick=()=>{if(history.length){stop();song=history.pop();li=Math.min(li,song.lanes.length-1);sync();msg('変更をひとつ戻しました。');}};
 $('genre').onchange=()=>change(()=>{song.genre=+$('genre').value;const style=E.styles[song.genre];if(song.key===undefined)song.mood=style[2];song.tempo=style[1];song.lanes.forEach((l,j)=>{l.voice=style[3][l.role]??2;E.fill(song,j,false);});});
 $('view').onchange=()=>{stop();song.view=$('view').selectedIndex;sync();};for(let k of ['mood','tempo','theme','material'])$(k).onchange=()=>change(()=>song[k]=k==='tempo'?Math.min(180,Math.max(50,Math.round(+$(k).value)||110)):+$(k).value);
@@ -51,12 +60,14 @@ const singer=StairSinger;
 arr('lyric-theme',singer.banks.map(x=>x[0]));
 function vocalSettings(){song.singing??={on:false,theme:0,text:'',reading:'',voice:0};return song.singing;}
 function vocalWarning(){const v=vocalSettings(),text=v.reading.trim()||v.text;return !singer.parse(text).length?'歌詞を生成するか、かなの歌詞を入力してください。':/[^ぁ-ゖァ-ヺー、。！？・「」『』…!?.,、\s]/u.test(text)?'漢字や英字を含む歌詞は「歌う読み」に全文をかなで入力してください。':'';}
-function syncExtras(){cuts();$('cadence').selectedIndex=song.cadence?1:0;$('wave').selectedIndex=song.waveOff?1:0;$('meter').value=song.meter||0;$('tonality').value=StairGroove.key(song);$('mode').selectedIndex=StairGroove.minor(song)?1:0;let v=vocalSettings();$('sing-on').checked=v.on;$('lyric-theme').value=v.theme;$('sing-voice').selectedIndex=v.voice;$('lyrics').value=v.text;$('reading').value=v.reading;$('exact-count').value=lane().steps.length;$('resize-track').disabled=!!song.range;$('sing-guide').textContent=v.on?(vocalWarning()||'合成音声を再生と書き出しに含めます。'):'歌詞の作成・編集は歌声をオフにしたままでもできます。';StairNotation.show(song,E.compose(song),li);}
+function syncExtras(){cuts();$('cadence').selectedIndex=song.cadence?1:0;$('wave').selectedIndex=song.waveOff?1:0;$('meter').value=song.meter||0;$('tonality').value=StairGroove.key(song);$('mode').selectedIndex=StairGroove.minor(song)?1:0;let v=vocalSettings();$('sing-on').checked=v.on;$('lyric-theme').value=v.theme;$('sing-voice').selectedIndex=v.voice;$('lyrics').value=v.text;$('reading').value=v.reading;$('exact-count').value=lane().steps.length;$('resize-track').disabled=!!song.range;$('sing-guide').textContent=v.on?(vocalWarning()||'合成音声を再生と書き出しに含めます。'):'歌詞の作成・編集は歌声をオフにしたままでもできます。';const score=E.compose(song);StairNotation.show(song,score,li);updatePrompt(score);
+$('vocal-level').value=v.level??110;$('vocal-percent').value=$('vocal-level').value+'%';
+$('brief-preset').value=song.brief?.preset??-1;$('brief-text').value=song.brief?.raw??'';}
 $('sing-on').onchange=()=>{stop();let v=vocalSettings();v.on=$('sing-on').checked;if(v.on&&!v.text.trim())v.text=singer.generate(v.theme);syncExtras();};
 $('lyric-theme').onchange=()=>vocalSettings().theme=+$('lyric-theme').value;
 $('sing-voice').onchange=()=>{stop();vocalSettings().voice=$('sing-voice').selectedIndex;};
 $('lyrics-roll').onclick=()=>{stop();remember();delete song.vocalParts;let v=vocalSettings();v.text=singer.generate(v.theme);v.reading='';v.on=true;sync();};
-for(const [id,k] of [['lyrics','text'],['reading','reading']])$(id).oninput=()=>{if(source)stop();delete song.vocalParts;vocalSettings()[k]=$(id).value;$('sing-guide').textContent=vocalWarning()||'入力した歌詞を使用します。';};
+for(const [id,k] of [['lyrics','text'],['reading','reading']])$(id).oninput=()=>{if(source)stop();delete song.vocalParts;vocalSettings()[k]=$(id).value;if($(id).value.trim()){vocalSettings().on=true;$('sing-on').checked=true;}updatePrompt(E.compose(song));$('sing-guide').textContent=vocalWarning()||'入力した歌詞を使用します。';};
 $('resize-track').onclick=()=>{const n=+$('exact-count').value;if(!Number.isInteger(n)||n<1||n>160){msg('段数は1〜160の整数で入力してください。');return;}if(song.range)return;change(()=>{let l=lane(),old=l.steps,len=old.length;if(n===len)return;
  // Resample boundaries in musical time, interpolating only where new landings are needed.
  l.steps=Array.from({length:n},(_,j)=>{const p=j*len/n,i=Math.floor(p),x=old[i],end=old[i+1]?.t??song.n;return {...x,t:x.t+(end-x.t)*(p-i)};});sel=Math.min(sel,n-1);});};
@@ -67,6 +78,28 @@ $('append').onclick=()=>{const saved=library[+$('library').value];if(!saved)retu
 function cuts(){let saved=library[+$('library').value];for(let [id,src,end] of [['cut-end',song,true],['cut-start',saved,false]]){const el=$(id),previous=el.value,stamp=src?JSON.stringify([src.title,src.n,src.lanes.map(l=>l.steps.map(x=>x.t))]):'';if(el.dataset.stamp===stamp)continue;el.dataset.stamp=stamp;el.replaceChildren();if(!src)continue;const time=[...new Set([0,...src.lanes.flatMap(l=>l.steps.map(x=>x.t)),src.n])].sort((a,b)=>a-b);for(let t of time){if(end?t<=0:t>=src.n)continue;let bar=StairGroove.bar(src);el.add(new Option(t===src.n?'曲の末尾':t===0?'曲頭':(Math.floor(t/bar)+1)+'小節 / ＋'+Number((t%bar).toFixed(3))+'拍',t));}if(end)el.add(new Option('曲末の主音を1拍残して接続','ring'));el.value=[...el.options].some(o=>o.value===previous)?previous:String(end?src.n:0);}}
 $('library').onchange=cuts;$('cadence').onchange=()=>change(()=>song.cadence=!!$('cadence').selectedIndex);$('wave').onchange=()=>change(()=>song.waveOff=!!$('wave').selectedIndex);
 $('random-all').onclick=()=>change(()=>{let r=n=>Math.floor(Math.random()*n),s=E.fresh();s.genre=r(E.styles.length);s.key=r(12);s.minor=!!r(2);s.mood=s.minor?1:0;s.meter=r(5);s.tempo=Math.round(E.styles[s.genre][1]*(.85+Math.random()*.3));s.n=StairGroove.bar(s)*[3,4,6,8][r(4)];s.theme=r(4);s.material=r(4);s.view=r(2);s.cadence=!!r(2);s.title=['雨粒','水晶','白夜','潮風','青葉','月影','木星','真昼'][r(8)]+'の'+['散歩道','列車','光','遠まわり','しらべ','手紙'][r(6)];s.lanes=[];const roles=[0,1,2,3].filter((x,i)=>!i||Math.random()>.23);for(let role of roles){E.lane(s,role);let l=s.lanes.at(-1);l.voice=role===2?[7,12,8][r(3)]:r(E.voices.length);l.ball=r(E.balls.length);l.vol=55+r(41);l.density=r(3);E.fill(s,s.lanes.length-1,false);}s.curve=Array.from({length:5},()=>.55+Math.random()*.65);let theme=r(StairSinger.banks.length);s.singing={on:!!r(2),voice:r(3),theme,text:StairSinger.generate(theme),reading:''};song=s;li=sel=0;msg('新曲を生成しました。「合奏を再生」で波形と動きを見られます。');});
+function updatePrompt(score){
+ $('prompt-style').value=StairBrief.describe(song,score);
+ $('prompt-lyrics').value=song.singing?.on?song.singing.text:'';
+ $('copy-lyrics').disabled=!$('prompt-lyrics').value;
+}
+$('brief-preset').add(new Option('自由入力・おまかせ',-1));arr('brief-preset',StairBrief.scenes.map(row=>row[0]));
+function readBrief(){return {preset:Number($('brief-preset').value),raw:$('brief-text').value};}
+for(const id of ['brief-preset','brief-text'])$(id).oninput=()=>{song.brief=readBrief();updatePrompt(E.compose(song));};
+$('brief-roll').onclick=()=>change(()=>{
+ const {preset,raw}=readBrief();song=StairBrief.create(preset,raw);li=sel=0;
+ $('brief-result').textContent=E.styles[song.genre][0]+' · '+song.tempo+' BPM · '+(song.singing.on?'歌あり':'インスト')+'で作曲しました。';
+});
+$('sheet-part').onchange=()=>{li=Number($('sheet-part').value);sel=0;stop();sync();};
+$('sheet-bars').onchange=()=>StairNotation.show(song,E.compose(song),li);
+$('vocal-level').oninput=()=>{stop();vocalSettings().level=Number($('vocal-level').value);$('vocal-percent').value=$('vocal-level').value+'%';};
+$('vocal-solo').onclick=()=>{const v=vocalSettings();v.on=true;if(!v.text&&!v.reading)v.text=singer.generate(v.theme);syncExtras();play(true);};
+for(const kind of ['style','lyrics'])$('copy-'+kind).onclick=async()=>{
+ const field=$('prompt-'+kind);
+ try{await navigator.clipboard.writeText(field.value);$('copy-status').textContent='コピーしました。';}
+ catch{field.focus();field.select();$('copy-status').textContent='文章を選択しました。端末のコピー操作を使ってください。';}
+};
+song.singing={on:true,voice:0,theme:7,text:'よるのまちに\nきみのこえがひびく',reading:''};
 sync();shelf();
 })();
 
