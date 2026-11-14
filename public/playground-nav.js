@@ -3,6 +3,7 @@
   const pages = [
     { url: '/', title: 'ホームページの遊び場', sub: 'すべての遊び場への入り口', icon: '⌂' },
     { url: '/character', title: 'CHARACTER FORGE', sub: 'ゲーム用キャラメーカー', icon: '⚄' },
+    { url: '/music-stairs', title: '音階階段で音楽を作る', sub: 'ボールが奏でる小さな工房', icon: '♫' },
     { url: '/draw-card', title: 'お絵描きカードバトル', sub: '描いた絵をカードにして対戦', icon: '✎' },
     { url: '/battle', title: 'CHRONICLE ARENA', sub: 'キャラ対戦・魔王討伐と後日談', icon: '⚔' },
     { url: '/hoshizora', title: 'HOSHIZORA', sub: '世界の88星座をめぐる図鑑', icon: '✧' },

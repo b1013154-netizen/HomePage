@@ -1,0 +1,2 @@
+importScripts('/vendor/lamejs/lame.min.js');
+onmessage=({data})=>{try{const enc=new lamejs.Mp3Encoder(1,44100,128),parts=[];for(let p=0;p<data.length;p+=1152){const block=Int16Array.from(data.subarray(p,p+1152),v=>Math.round(v*32767));let out=enc.encodeBuffer(block);if(out.length)parts.push(out);}parts.push(enc.flush());postMessage({blob:new Blob(parts,{type:'audio/mpeg'})});}catch(e){postMessage({error:String(e)});}};
