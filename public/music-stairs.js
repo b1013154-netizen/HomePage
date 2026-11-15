@@ -12,7 +12,7 @@ $('score').textContent=song.lanes.length+' TRACKS　/　'+song.n+' BEATS　/　'
 function stop(t){run++;cancelAnimationFrame(raf);if(source){source.onended=null;try{source.stop();}catch{}source.disconnect();source=null;}$('stop').disabled=true;$('play').disabled=false;draw(song,li,sel);if(t){msg(t);if(song.singing?.on)$('sing-guide').textContent=t;}$('vocal-solo').disabled=false;}
 async function master(){if(vocalSettings().on&&vocalWarning())throw Error(vocalWarning());let k=JSON.stringify(song);if(k!==key){let score=E.compose(song);let data=E.render(score);const vocals=StairVocalScore.melody(song,score);let stem=null;
 if(song.singing.on){
- if(!vocals.length)throw Error('歌える音符がありません。メロディーなどの有音程パートを追加し、ミュートを解除してください。');
+ if(!vocals.length)throw Error('歌のメロディーを作れません。歌詞と曲の長さを確認してください。');
  const settings={...song.singing};stem=await StairVocalScore.sing(song,score,vocals,data.length);
  let peak=0;for(const sample of stem)peak=Math.max(peak,Math.abs(sample));
  if(!(peak>.01))throw Error('歌声を生成できませんでした。歌詞と音符を確認してください。');
@@ -93,10 +93,19 @@ $('brief-roll').onclick=()=>change(()=>{
 $('sheet-part').onchange=()=>{li=Number($('sheet-part').value);sel=0;stop();sync();};
 $('sheet-bars').onchange=()=>StairNotation.show(song,E.compose(song),li);
 $('vocal-level').oninput=()=>{stop();vocalSettings().level=Number($('vocal-level').value);$('vocal-percent').value=$('vocal-level').value+'%';};
+$('vocal-roll').onclick=()=>{
+ stop();remember();
+ const v=vocalSettings();v.on=true;
+ if(!v.text.trim()&&!v.reading.trim())v.text=singer.generate(v.theme);
+ const roll=()=>crypto.getRandomValues(new Uint32Array(1))[0];
+ v.melodySeed=roll();
+ if(song.vocalParts)for(const part of song.vocalParts)part.settings.melodySeed=roll();
+ sync();$('sing-guide').textContent='歌の旋律を作り直しました。「歌声だけ試聴」で聴けます。';
+};
 $('vocal-midi').onclick=()=>{
  const warning=vocalWarning();if(warning){$('sing-guide').textContent=warning;return;}
  const active={...song,singing:{...song.singing,on:true}},notes=StairVocalScore.melody(active,E.compose(song));
- if(!notes.length){$('sing-guide').textContent='メロディーのミュートを解除してください。';return;}
+ if(!notes.length){$('sing-guide').textContent='歌詞を入力し、歌う区間を確認してください。';return;}
  download(StairVocalScore.midi(song,notes),'mid',song.title);$('sing-guide').textContent='テンポ・メロディー・かな歌詞入りのMIDIを保存しました。';
 };
 $('vocal-solo').onclick=()=>{const v=vocalSettings();v.on=true;if(!v.text&&!v.reading)v.text=singer.generate(v.theme);syncExtras();play(true);};

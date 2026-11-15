@@ -1,35 +1,75 @@
 window.StairVocalScore=(()=>{
   const ppq=480;
+  // These contours describe sung phrases, independently of instrumental onsets.
+  const contours=[[0,0,2,4,4,2,0],[0,2,2,0,3,2,0],[2,2,0,-2,0,2,0],
+    [-2,0,0,2,5,4,2],[0,3,2,2,0,-2,0],[4,2,2,0,0,-2,0]];
+  function phrases(text){
+    return text.trim().split(/[、。！？!?.,\s]+/u).flatMap(line=>{
+      const tokens=StairSinger.parse(line);
+      const count=Math.ceil(tokens.length/12);
+      return Array.from({length:count},(_,i)=>tokens.slice(Math.round(i*tokens.length/count),Math.round((i+1)*tokens.length/count)));
+    });
+  }
   function melody(song,score){
-    const beat=60/song.tempo,origin=score.start??.55, result=[];
-    const parts=song.vocalParts||[{t:0,end:Infinity,settings:song.singing}];
+    const result=[],beat=60/song.tempo,bar=StairGroove.bar(song),tonic=StairGroove.tonic(song);
+    const scale=StairGroove.minor(song)?[0,2,3,5,7,8,10]:[0,2,4,5,7,9,11];
+    const harmony=score.events.filter(e=>e.chord&&song.lanes[e.lane]?.role===1)
+      .map(e=>({at:(e.time-(score.start??.55))/beat,chord:e.chord})).sort((a,b)=>a.at-b.at);
+    const parts=song.vocalParts||[{t:0,end:song.n,settings:song.singing}];
     for(const part of parts){
       const v=part.settings;
       if(!v?.on)continue;
-      const text=v.reading?.trim()||v.text||'';
-      const mora=StairSinger.parse(text);
-      if(!mora.length)continue;
-      const events=score.events.filter(e=>e.v<18&&e.amp>0&&e.time>=origin+part.t*beat-.035&&e.time<origin+part.end*beat-.035);
-      const lead=[0,1,2,3].flatMap(role=>song.lanes.map((l,i)=>l.role===role?i:-1)).find(i=>i>=0&&events.some(e=>e.lane===i));
-      const notes=new Map();
-      for(const e of events.filter(e=>e.lane===lead)){
-        const k=e.step??e.time,old=notes.get(k);
-        if(!old)notes.set(k,{...e});
-        else if(e.m>old.m){old.m=e.m;}
-      }
-      const ordered=[...notes.values()].sort((a,b)=>a.time-b.time);
-      ordered.forEach((e,i)=>{
-        const start=Math.max(Math.round(part.t*ppq),Math.round((e.time-origin)/beat*ppq));
-        const end=Math.round(Math.min((e.time+e.len-origin)/beat,part.end,ordered[i+1]?(ordered[i+1].time-origin)/beat:Infinity)*ppq);
-        const first=Math.floor(i*mora.length/ordered.length),after=Math.floor((i+1)*mora.length/ordered.length);
-        const count=Math.max(1,after-first);
-        const tied=i>0&&first===Math.floor((i-1)*mora.length/ordered.length);
-        for(let j=0;j<count;j++){
-          const tick=start+Math.round((end-start)*j/count), until=start+Math.round((end-start)*(j+1)/count);
+      const lines=phrases(v.reading?.trim()||v.text||'');
+      if(!lines.length)continue;
+      const seed=(v.melodySeed??song.seed??0)>>>0;
+      let state=seed;
+      const random=()=>{state=(Math.imul(state,1664525)+1013904223)>>>0;return state/4294967296;};
+      const motif=Math.floor(random()*contours.length),mid=65+Math.floor(random()*5);
+      const start=Math.round(part.t*ppq),end=Math.round(Math.min(song.n,part.end)*ppq);
+      const weights=lines.map(line=>line.length+2),total=weights.reduce((a,b)=>a+b,0);
+      let used=0,begin=start;
+      lines.forEach((line,index)=>{
+        const boundary=()=>start+Math.round((end-start)*used/total);
+        used+=weights[index];
+        const ideal=boundary(),grid=bar*ppq/2,snapped=start+Math.round((ideal-start)/grid)*grid;
+        const finish=index===lines.length-1?end:
+          (snapped>begin+ppq/2 && snapped<ideal+(end-start)*weights[index+1]/total*.45 && snapped<end-ppq/2 && Math.abs(snapped-ideal)<(ideal-begin)*.2?snapped:ideal);
+        const span=finish-begin;
+        const unit=Math.min(span/(line.length+2),ppq*(song.genre===3?.65:.95));
+        const pickup=Math.min(span*.10,ppq*([0,.25,.5][(seed+index)%3]));
+        const breath=Math.min(ppq*.55,span*.12);
+        const length=Math.min(span-pickup-breath,unit*(line.length+1.5));
+        const shape=contours[(motif+(index%2))%contours.length];
+        const rhythm=line.map((u,j)=>j===line.length-1?2.3:u.c==='っ'?.55:
+          [1,1,.75,1.25,1,.75][(j+seed%6)%6]);
+        const sum=rhythm.reduce((a,b)=>a+b,0);
+        let elapsed=0,previous=mid;
+        for(let j=0;j<line.length;j++){
+          const onset=()=>{
+            const ideal=begin+pickup+length*elapsed/sum;
+            const grid=Math.max(1,ppq/2**Math.max(2,Math.ceil(Math.log2(4*ppq*sum/length))));
+            return Math.round(Math.max(begin,Math.min(finish,Math.round(ideal/grid)*grid)));
+          };
+          const tick=onset();elapsed+=rhythm[j];const until=onset();
           if(until<=tick)continue;
-          const token=mora[first+j];
-          result.push({tick,end:until,m:e.m,lyric:tied&&j===0?'あいうえおん'[token.v]:token.c,voice:v.voice||0});
+          const t=tick/ppq,anchor=j===0||j===line.length-1||Math.abs(t/bar-Math.round(t/bar))*bar<.09;
+          const [root,q]=Ensemble.harm(song,t);
+          const actual=harmony.findLast(h=>h.at<=t+.015)?.chord;
+          const chordRoot=actual?.root??tonic+root;
+          const chord=(Ensemble.chords[actual?.q??q]?.[1]||[0,4,7]).slice(0,3);
+          const pitchClasses=anchor?chord.map(d=>(chordRoot+d)%12):scale.map(d=>(tonic+d)%12);
+          const target=mid+shape[Math.round(j*(shape.length-1)/Math.max(1,line.length-1))]+(song.chorus&&t>=song.chorus?2:0);
+          let m=previous,best=Infinity;
+          for(let pitch=59;pitch<=78;pitch++){
+            if(!pitchClasses.includes(pitch%12))continue;
+            const cost=Math.abs(pitch-target)+.27*Math.abs(pitch-previous);
+            if(cost<best){m=pitch;best=cost;}
+          }
+          if(j>0&&(line[j].c==='っ'||line[j].c==='ん'))m=previous;
+          result.push({tick,end:until,m,lyric:line[j].c,voice:v.voice||0});
+          previous=m;
         }
+        begin=finish;
       });
     }
     return result;
