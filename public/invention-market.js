@@ -52,6 +52,17 @@ const WorkshopMarket=(()=>{
     });
     scene('victory','検査合格','＋'+gain+' コイン');WorkshopMusic.chime();return gain;
   }
+  const fee=score=>score>=60?score:0;
+  async function offer(index,score){
+    const gain=await change(a=>{
+      a.offers??={};
+      const best=a.offers[index]??0;
+      const amount=Math.max(0,fee(score)-fee(best));
+      a.offers[index]=Math.max(best,score);a.coins+=amount;return amount;
+    });
+    if(score>=60){scene('victory','納品合格',score+'点 ／ ＋'+gain+' コイン');WorkshopMusic.chime()}
+    return gain;
+  }
   function init(){
     refresh();WorkshopArt.ready.then(refresh);
     for(const [id,name] of Object.entries(sections))$('shopSection').add(new Option(name,id));
@@ -62,5 +73,5 @@ const WorkshopMarket=(()=>{
     $('closeShop').onclick=()=>$('market').close();
     window.addEventListener('storage',e=>{if(e.key===key){try{account=read();refresh()}catch{}}});
   }
-  return {init,victory,reward:i=>account.cleared.includes(i)?5:rewardFor(i),available:item=>!item.price||account.owned.includes(item.id)};
+  return {init,victory,offer,bestOffer:index=>account.offers?.[index]??null,reward:i=>account.cleared.includes(i)?5:rewardFor(i),available:item=>!item.price||account.owned.includes(item.id)};
 })();

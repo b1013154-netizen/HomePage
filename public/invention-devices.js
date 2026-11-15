@@ -100,10 +100,10 @@ const DeviceLab=(()=>{
     el('closeDesign').onclick=()=>dialog.close();dialog.onchange=previewDesign;
     el('deviceForm').onsubmit=e=>{e.preventDefault();const d={...draft(),id:crypto.randomUUID()};designs.push(d);
       let saved=true;try{localStorage.setItem(slot,JSON.stringify(designs))}catch{saved=false}
-      renderShelf();dialog.close();pick(d);
+      renderShelf();dialog.close();pick(d);window.dispatchEvent(new CustomEvent('workshop-design-saved',{detail:d.id}));
       if(!saved)el('status').textContent+=' このブラウザでは設計図を保存できません。';
     };
     WorkshopArt.ready.then(()=>{if(dialog.open)previewDesign()});
   }
-  return {init,draw,sample,describe,stages,timing,cues};
+  return {init,draw,sample,describe,stages,timing,cues,saved:()=>designs.slice()};
 })();

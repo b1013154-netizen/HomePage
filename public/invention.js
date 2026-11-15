@@ -182,6 +182,7 @@
     tool=d;for(const b of tools.values())b.setAttribute('aria-pressed','false');
     $('detail').textContent=d.name+' ／ '+DeviceLab.describe(d);say(d.name+' を選択しました。作業台のマスを押して配置、もう一度押して回転します。');
   });
+  WorkshopRequests.init();
   $('commission').onclick=()=>{load(plans.findIndex(p=>p.conditions));$('openDesign').focus()};
   new ResizeObserver(paint).observe(canvas);load(0);
   art.ready.then(()=>{
