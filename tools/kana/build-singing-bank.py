@@ -18,19 +18,29 @@ for name in sorted(labels.namelist()):
         continue
     song = Path(name).stem
     previous = "pau"
+    preceding = "pau"
+    prev_start = preceding_start = 0
     for line in labels.read(name).decode("utf8").splitlines():
         a,b,p = line.split()
         a,b = int(a)/1e7,int(b)/1e7
         if p.lower() in ("a","i","u","e","o","n") and (p=="N" or p.lower()!="n"):
             onset = prev_start if previous in rows else a
             kana = "ん" if p=="N" else rows.get(previous,rows["∅"])["aiueo".index(p.lower())]
-            rating = abs(b-a-.24) + max(0,a-onset-.12) + (.3 if p.isupper() and p!="N" else 0)
-            if kana not in best or rating < best[kana][0]:
-                best[kana] = (rating,song,max(onset,a-.16),a,min(b,a+.40))
+            left = preceding if previous in rows else previous
+            rating = abs(b-a-.22) + max(0,a-onset-.12) + (.3 if p.isupper() and p!="N" else 0)
+            variants = [(kana,max(onset,a-.16))]
+            # Keep the actual release of the preceding vowel into this consonant.
+            if left in ("a","i","u","e","o","N"):
+                left_start = preceding_start if previous in rows else prev_start
+                variants.append((left+":"+kana,max(left_start,onset-.044)))
+            for key,start in variants:
+                if key not in best or rating < best[key][0]:
+                    best[key] = (rating,song,start,a,min(b,a+.38),onset-start)
+        preceding,preceding_start = previous,prev_start
         previous,prev_start=p,a
 out=array.array("h")
 meta={}
-for kana,(_,song,start,vowel,end) in sorted(best.items()):
+for kana,(_,song,start,vowel,end,lead) in sorted(best.items()):
     with wave.open(io.BytesIO(songs.read(f"PJS_corpus_ver1.1/{song}/{song}_song.wav"))) as w:
         w.setpos(round(start*w.getframerate()))
         raw=w.readframes(round((end-start)*w.getframerate()))
@@ -49,9 +59,9 @@ for kana,(_,song,start,vowel,end) in sorted(best.items()):
         pos=max(range(pos+int(period*.80),pos+int(period*1.23)),key=sample.__getitem__)
         marks.append(pos)
     if len(marks)<3: continue
-    meta[kana]=[len(out),len(sample),onset,marks,max(map(abs,sample))]
+    meta[kana]=[len(out),len(sample),onset,marks,max(map(abs,sample)),round(lead*24000)]
     out.extend(sample)
 assets=Path("public/assets")
-(assets/"pjs-voice.bin").write_bytes(out.tobytes())
-(assets/"pjs-voice.json").write_text(json.dumps(meta,ensure_ascii=False,separators=(",",":")),encoding="utf8")
+(assets/"pjs-legato.bin").write_bytes(out.tobytes())
+(assets/"pjs-legato.json").write_text(json.dumps(meta,ensure_ascii=False,separators=(",",":")),encoding="utf8")
 print(len(meta),"syllables,",len(out)*2,"bytes")

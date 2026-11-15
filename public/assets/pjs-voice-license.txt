@@ -3,7 +3,7 @@ https://sites.google.com/site/shinnosuketakamichi/research-topics/pjs_corpus
 Manual phoneme boundaries by UtaUtaUtau
 https://github.com/UtaUtaUtau/pjs-manual-labels
 Adaptations: syllable extraction, resampling, pitch-mark analysis, 16-bit conversion.
-pjs-voice.bin and pjs-voice.json are distributed under CC BY-SA 4.0.
+The pjs-voice and pjs-legato audio banks and their indexes are distributed under CC BY-SA 4.0.
 https://creativecommons.org/licenses/by-sa/4.0/
 
 Attribution-ShareAlike 4.0 International
