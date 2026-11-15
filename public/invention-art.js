@@ -58,19 +58,32 @@ const WorkshopArt = (() => {
       const seam=h*.78;
       slice(0,seam,w,h-seam);
       for(let i=0;i<5;i++){
-        const width=w/5,tilt=Math.max(0,Math.min(1,progress*6-i));
-        c.save();c.translate(0,seam);c.transform(1,0,-.34*tilt,1-.65*tilt,0,0);c.translate(0,-seam);
+        const width=w/5,fall=Math.max(0,Math.min(1,(progress-i*.186)/.25));
+        const angle=1.27*fall*fall;
+        c.save();c.translate(0,seam);c.transform(1,0,-.49*Math.sin(angle),Math.cos(angle),0,0);c.translate(0,-seam);
         slice(i*width,0,width,seam);c.restore();
       }
     }else if(type==='lever'&&progress>0){
-      slice(0,h*.48,w,h*.52);c.translate(w/2,h*.38);c.rotate(active*.24);c.translate(-w/2,-h*.38);slice(0,0,w,h*.53);
+      slice(0,h*.48,w,h*.52);c.translate(w/2,h*.38);c.rotate(-active*.27);c.translate(-w/2,-h*.38);slice(0,0,w,h*.53);
+    }else if(type==='spring'){
+      // Keep the wooden foot fixed; only the coil and its piston travel.
+      const top=h*.62,head=w*.78,shift=progress*w*.18;
+      slice(0,top,w,h-top);
+      c.save();c.translate(5,0);c.scale((head-shift-5)/(head-5),1);c.translate(-5,0);slice(5,0,head-5,top);c.restore();
+      c.save();c.translate(-shift,0);slice(head,0,w-head,top);c.restore();
+    }else if(type==='bell'&&progress>0){
+      slice(0,0,w,h);
+      for(let n=0;n<3;n++){
+        const dt=progress-[.34,.50,.66][n];
+        if(dt<0)continue;
+        c.save();c.translate(0,-3*Math.exp(-12*dt)*Math.sin(83*dt));slice(w*(.07+n*.24),h*.08,w*.17,h*.71);c.restore();
+      }
     }else if(type==='goal'&&goal===3&&progress>0){
       const pivotX=w*.53,pivotY=h*.33,r=h*.33;
       c.save();c.beginPath();c.rect(0,0,w,h);c.arc(pivotX,pivotY,r,0,2*Math.PI);c.clip('evenodd');slice(0,0,w,h);c.restore();
-      c.translate(pivotX,pivotY);c.rotate(progress*Math.PI*2);c.beginPath();c.arc(0,0,r,0,2*Math.PI);c.clip();c.translate(-pivotX,-pivotY);slice(0,0,w,h);
+      c.translate(pivotX,pivotY);c.rotate((1-Math.pow(1-progress,2))*Math.PI*3.5);c.beginPath();c.arc(0,0,r,0,2*Math.PI);c.clip();c.translate(-pivotX,-pivotY);slice(0,0,w,h);
     }else{
-      if(type==='spring')c.scale(1-.17*active,1);
-      if(type==='bell')c.translate(0,-active*2);
+
       if(type==='goal'&&goal===0){c.translate(w/2,h*.87);c.rotate(Math.sin(progress*20)*active*.12);c.translate(-w/2,-h*.87)}
       if(type==='goal'&&goal===2){c.translate(w*.28,h*.8);c.transform(1,0,active*.14,1+.06*active,0,0);c.translate(-w*.28,-h*.8)}
       slice(0,0,w,h);
@@ -84,6 +97,25 @@ const WorkshopArt = (() => {
       }
     }
     c.restore();
+    if(type==='start'||type==='spring'){
+      c.save();c.rotate(direction*Math.PI/2);
+      if(type==='start'){
+        // Sliding brass escapement at the throat of the inclined wooden chute.
+        c.translate(-1,4);c.rotate(.44);
+        c.fillStyle='#372c1e';c.fillRect(-2,-7,4,3);
+        const pin=c.createLinearGradient(-1,0,2,0);
+        pin.addColorStop(0,'#584022');pin.addColorStop(.4,'#f6d691');pin.addColorStop(1,'#926535');
+        c.fillStyle=pin;c.fillRect(-.9,-6-progress*4.8,1.8,6);
+      }else{
+        // A guide and cocked striker share the spring's off-centre launch lane.
+        c.strokeStyle='#553e27';c.lineWidth=2.6;c.beginPath();c.moveTo(-24,-11);c.lineTo(17,-11);c.stroke();
+        c.strokeStyle='#d6b57b';c.lineWidth=.75;c.stroke();
+        const head=-13-progress*8;
+        c.strokeStyle='#a68858';c.lineWidth=1.2;c.beginPath();c.moveTo(21-progress*9,1);c.lineTo(21-progress*9,-4);c.lineTo(head-2,-4);c.stroke();
+        c.fillStyle='#6e4c29';c.fillRect(head-3,-10,3,9);c.fillStyle='#eccc8c';c.fillRect(head-3,-10,1,8);
+      }
+      c.restore();
+    }
     if(type!=='goal'){
       c.save();c.rotate(direction*Math.PI/2);c.fillStyle='#31281c';c.strokeStyle='#ffe7aa';c.lineWidth=1.2;
       c.beginPath();c.moveTo(22,-4.5);c.lineTo(30,0);c.lineTo(22,4.5);c.closePath();c.fill();c.stroke();c.restore();
