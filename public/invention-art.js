@@ -1,5 +1,5 @@
 const WorkshopArt = (() => {
-  function draw(c,type,direction=0,progress=0,goal=0){
+  function drawFallback(c,type,direction=0,progress=0,goal=0){
     c.save(); c.rotate(direction*Math.PI/2);
     const metal=(y,h,colors=['#694927','#fae6a6','#bc894a','#53361b'])=>{
       const g=c.createLinearGradient(0,y,0,y+h);
@@ -32,5 +32,62 @@ const WorkshopArt = (() => {
     c.restore();
   }
   function ball(c,x,y,r){const g=c.createRadialGradient(x-r*.35,y-r*.5,r*.05,x,y,r);g.addColorStop(0,'#fff');g.addColorStop(.23,'#e5ede8');g.addColorStop(.5,'#60756c');g.addColorStop(.72,'#354638');g.addColorStop(1,'#bfc7ad');c.beginPath();c.arc(x,y,r,0,Math.PI*2);c.fillStyle=g;c.fill()}
-  return {draw,ball};
+  const pieces=new Image(), devices=new Image();
+  pieces.src='/assets/invention-components.webp';
+  devices.src='/assets/invention-devices.webp';
+  const ready=Promise.allSettled([pieces.decode(),devices.decode()]);
+  // Source rectangles are measured on a half-size contact sheet.
+  const crops={
+    rail:[5,58,155,74],bend:[162,28,151,123],domino:[317,33,163,99],
+    lever:[2,204,156,77],spring:[162,201,159,81],bell:[326,172,153,128],
+    start:[320,154,158,161]
+  };
+  const targets=[[15,12,140,142],[177,2,130,151],[334,2,140,151],[23,156,131,160],[163,158,148,157]];
+  function draw(c,type,direction=0,progress=0,goal=0){
+    const endpoint=type==='goal'||type==='start',image=endpoint?devices:pieces;
+    const crop=type==='goal'?targets[goal]:crops[type];
+    if(!crop||!image.complete||!image.naturalWidth){drawFallback(c,type,direction,progress,goal);return}
+    const [x,y,w,h]=crop,scale=Math.min(58/w,(endpoint?46:51)/h);
+    const active=Math.sin(Math.PI*progress), sourceScale=image.naturalWidth/480;
+    c.save();c.rotate(direction*Math.PI/2);c.scale(scale,scale);
+    c.translate(-w/2,-h/2-(endpoint?2/scale:0));
+    function slice(left,top,width,height){
+      c.drawImage(image,(x+left)*sourceScale,(y+top)*sourceScale,width*sourceScale,height*sourceScale,left,top,width,height);
+    }
+    if(type==='domino'&&progress>0){
+      const seam=h*.78;
+      slice(0,seam,w,h-seam);
+      for(let i=0;i<5;i++){
+        const width=w/5,tilt=Math.max(0,Math.min(1,progress*6-i));
+        c.save();c.translate(0,seam);c.transform(1,0,-.34*tilt,1-.65*tilt,0,0);c.translate(0,-seam);
+        slice(i*width,0,width,seam);c.restore();
+      }
+    }else if(type==='lever'&&progress>0){
+      slice(0,h*.48,w,h*.52);c.translate(w/2,h*.38);c.rotate(active*.24);c.translate(-w/2,-h*.38);slice(0,0,w,h*.53);
+    }else if(type==='goal'&&goal===3&&progress>0){
+      const pivotX=w*.53,pivotY=h*.33,r=h*.33;
+      c.save();c.beginPath();c.rect(0,0,w,h);c.arc(pivotX,pivotY,r,0,2*Math.PI);c.clip('evenodd');slice(0,0,w,h);c.restore();
+      c.translate(pivotX,pivotY);c.rotate(progress*Math.PI*2);c.beginPath();c.arc(0,0,r,0,2*Math.PI);c.clip();c.translate(-pivotX,-pivotY);slice(0,0,w,h);
+    }else{
+      if(type==='spring')c.scale(1-.17*active,1);
+      if(type==='bell')c.translate(0,-active*2);
+      if(type==='goal'&&goal===0){c.translate(w/2,h*.87);c.rotate(Math.sin(progress*20)*active*.12);c.translate(-w/2,-h*.87)}
+      if(type==='goal'&&goal===2){c.translate(w*.28,h*.8);c.transform(1,0,active*.14,1+.06*active,0,0);c.translate(-w*.28,-h*.8)}
+      slice(0,0,w,h);
+      if(type==='goal'&&goal===1&&progress){
+        const glow=c.createRadialGradient(w*.53,h*.3,0,w*.53,h*.3,w*.68);
+        glow.addColorStop(0,'#ffe09ec9');glow.addColorStop(1,'#fff0a000');c.fillStyle=glow;c.fillRect(-w*.2,-h*.32,w*1.5,h*1.3);
+      }
+      if(type==='goal'&&goal===4&&progress){
+        c.strokeStyle='#fff4dbc9';c.lineWidth=3;
+        for(let i=0;i<3;i++){const drift=Math.sin(progress*9+i)*5;c.beginPath();c.moveTo(w*.89+i*3,h*.39);c.bezierCurveTo(w*.85+drift,h*.24,w*.99-drift,h*.17,w*.9+drift,h*(.15-progress*.17));c.stroke()}
+      }
+    }
+    c.restore();
+    if(type!=='goal'){
+      c.save();c.rotate(direction*Math.PI/2);c.fillStyle='#31281c';c.strokeStyle='#ffe7aa';c.lineWidth=1.2;
+      c.beginPath();c.moveTo(22,-4.5);c.lineTo(30,0);c.lineTo(22,4.5);c.closePath();c.fill();c.stroke();c.restore();
+    }
+  }
+  return {draw,ball,ready};
 })();
