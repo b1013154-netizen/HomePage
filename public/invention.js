@@ -33,7 +33,10 @@
     });
     if(plan.conditions){
       limit=1;
-      if(plan.conditions.range===3){const target=plan.route[1].key;for(let k=plan.dock+1;k<target;k++)pits.add(k)}
+      if(plan.conditions.range>1){
+        const stride=(plan.route[1].key-plan.dock)/plan.conditions.range;
+        for(let n=1;n<plan.conditions.range;n++)pits.add(plan.dock+n*stride);
+      }
     }
     options();selectTool(plan.route.find(p=>!locked.has(p.key))?.type||'rail');
     $('title').textContent=plan.name;
@@ -44,6 +47,7 @@
       $('brief').textContent=plan.brief;$('requirements').textContent='設置場所　'+coordinate(plan.dock)+' ／ 自作装置 1台';
       $('hintText').textContent=plan.hint;
     }
+    $('requirements').textContent+=' ／ クリア報酬 '+WorkshopMarket.reward(plan.index)+' コイン';
     $('next').hidden=true;say(plan.conditions?'「装置を設計する」から試作して、金色のマスに置きましょう。':'投入口の矢印からスタート。ねじ留めされた部品は固定です。');sync();
   }
   function sync(){
@@ -75,7 +79,7 @@
   }
   function finish(message,success=false){
     run=null;$('run').textContent='▶　もう一度放す';say(message);
-    if(success){completed.add(plan.index);try{localStorage.setItem('workshop.solved',JSON.stringify([...completed]))}catch{}options();$('next').hidden=plan.index===plans.length-1}
+    if(success){const solved=plan;WorkshopMarket.victory(solved).then(n=>{if(plan===solved){$('requirements').textContent=$('requirements').textContent.replace(/クリア報酬 \d+ コイン/,'クリア報酬 5 コイン');if(!run&&$('status').textContent===message)say(message+'　＋'+n+' コイン')}});completed.add(plan.index);try{localStorage.setItem('workshop.solved',JSON.stringify([...completed]))}catch{}options();$('next').hidden=plan.index===plans.length-1}
     paint();
   }
   function enter(k,incoming,now){
@@ -90,8 +94,8 @@
       const d=p.design;
       if(run.visited.has(k)||p.dir!==(incoming+d.turn+4)%4)failure=coordinate(k)+' の入口の向きが合いません。装置を回して入口と投入口を合わせましょう。';
       else{
-        for(const module of [d.intake,d.drive,d.output])run.used[module]=(run.used[module]||0)+1;
-        run.qualified=plan.conditions&&Object.entries(plan.conditions).every(([key,value])=>d[key]===value);
+        for(const {base} of DeviceLab.stages(d))run.used[base]=(run.used[base]||0)+1;
+        run.qualified=plan.conditions&&Object.entries(plan.conditions).every(([key,value])=>d[key]===value||WorkshopStock.items[key]?.[d[key]]?.base===value);
         say(d.name+' が作動中　'+DeviceLab.describe(d));
       }
     }else if(incoming!==null){
@@ -101,15 +105,15 @@
     }
     const type=failure&&p?.type!=='goal'?(pits.has(k)?'pit':'stop'):p.type;
     if(!failure){run.visited.add(k);triggered.set(k,incoming)}
-    Object.assign(run,{k,p,type,failure,incoming,dir:p?.dir??incoming,time:now,beat:0,duration:type==='device'?1250:physics.lengths[type]});
+    Object.assign(run,{k,p,type,failure,incoming,dir:p?.dir??incoming,time:now,beat:0,cues:type==='device'?DeviceLab.cues(p.design):physics.beats[type],duration:type==='device'?DeviceLab.timing(p.design).duration:physics.lengths[type]});
     motion={k,type,incoming,design:p?.design,dir:run.dir,t:0};frame=requestAnimationFrame(tick);
   }
   function tick(now){
     if(!run)return;
     const {k,p,type}=run,t=Math.min(1,(now-run.time)/run.duration);
     motion.t=t;
-    const cues=type==='device'?[.24,.42,.62]:physics.beats[type];
-    while(run.beat<cues.length&&t>=cues[run.beat]){const n=run.beat++;tone(type==='device'?[p.design.intake,p.design.drive,p.design.output][n]:type,n);}
+    const cues=run.cues;
+    while(run.beat<cues.length&&t>=cues[run.beat]){const n=run.beat++;const stage=n===0?0:n===cues.length-1?2:1;tone(type==='device'?DeviceLab.stages(p.design)[stage].base:type,n%3);}
     paint();
     if(t<1){frame=requestAnimationFrame(tick);return}
     if(run.failure){finish(run.failure);return}
@@ -173,6 +177,7 @@
   }
   $('plans').onchange=e=>load(Number(e.target.value));$('reset').onclick=()=>load(plan.index);
   $('next').onclick=()=>load(plan.index+1);$('hint').onclick=()=>{const h=$('hintText');h.hidden=!h.hidden;$('hint').textContent=h.hidden?'設計ヒントを見る':'ヒントを閉じる'};
+  WorkshopMarket.init();WorkshopMusic.init();
   DeviceLab.init(d=>{
     tool=d;for(const b of tools.values())b.setAttribute('aria-pressed','false');
     $('detail').textContent=d.name+' ／ '+DeviceLab.describe(d);say(d.name+' を選択しました。作業台のマスを押して配置、もう一度押して回転します。');

@@ -64,6 +64,27 @@ const Workshop = (() => {
     const dock=start+dirs[dir][0]+7*dirs[dir][1];
     plans.push({index:plans.length,name,goal,conditions,brief,hint,dock,route:[{type:'start',key:start,dir},{type:'goal',key:target,dir:0}]});
   }
+  for(const [name,start,dir,out,range,slot,id,goal] of [
+    ['雨上がりの銀鈴',14,0,0,2,'drive','drive-bell-1',0],
+    ['琥珀色の書斎',20,2,2,1,'intake','intake-rail-3',1],
+    ['運河を渡る伝令',7,1,0,4,'output','output-spring-2',2],
+    ['風見鶏の休日',4,1,2,2,'intake','intake-lever-2',3],
+    ['木琴のお茶会',28,0,3,2,'drive','drive-bell-2',4],
+    ['二段巻上げ灯台',30,3,0,3,'drive','drive-rail-4',1],
+    ['磁石街の朝便',5,1,2,3,'intake','intake-bend-1',2],
+    ['時計塔の目覚まし',14,0,0,4,'drive','drive-domino-4',0],
+    ['月明かりの長距離便',7,1,0,5,'output','output-spring-5',2],
+    ['南風の送風室',32,3,3,2,'drive','drive-rail-3',3],
+    ['水琴窟の合図',33,3,2,3,'drive','drive-bell-5',4],
+    ['大運河の六間跳び',7,1,0,6,'output','output-spring-6',3]
+  ]){
+    const step=n=>dirs[n][0]+7*dirs[n][1],dock=start+step(dir),target=dock+step(out)*range;
+    const item=WorkshopStock.items[slot][id],turn=dir===out?'直進':(out-dir+4)%4===1?'右折':'左折';
+    plans.push({index:plans.length,name,goal,dock,conditions:{[slot]:id,range},
+      brief:item.name+' を組み込んだ装置で、'+goals[goal]+' を動かしてください。',
+      hint:'部品商店の「'+WorkshopStock.sections[slot]+'」で '+item.name+' を購入。'+turn+'の入口と射程'+range+'の出口を組み、矢印を'+'右下左上'[out]+'へ向けます。',
+      route:[{type:'start',key:start,dir},{type:'goal',key:target,dir:0}]});
+  }
   return {plans,parts,goals,dirs};
 })();
 
