@@ -12,9 +12,17 @@ window.StairVoicevox=(()=>{
     return res;
   }
   function kana(c){return (c==='を'?'お':c).replace(/[ぁ-ゖ]/g,m=>String.fromCharCode(m.charCodeAt(0)+96));}
-  async function sing(song,score,notes,length){
+  async function manifest(){return (await request('/engine_manifest')).json();}
+  async function band(score,length){
+    const events=score.events.map(e=>[e.time,e.len,e.m,e.v,e.amp]);
+    const wav=await (await request('/playground-band',{events,end:score.end})).arrayBuffer();
+    const ctx=new OfflineAudioContext(1,1,StairSound.rate);
+    const pcm=(await ctx.decodeAudioData(wav)).getChannelData(0);
+    const data=new Float32Array(length);data.set(pcm.subarray(0,length));return data;
+  }
+  async function layer(song,score,notes,length,info){
     const rate=StairSound.rate,beat=60/song.tempo,stem=new Float32Array(length);
-    const manifest=await (await request('/engine_manifest')).json(),fps=Number(manifest.frame_rate)||93.75;
+    const fps=Number(info.frame_rate)||93.75;
     const decoder=new OfflineAudioContext(1,1,rate);
     for(const group of StairVocalScore.chunks(notes,song.tempo)){
       const pad=Math.ceil(fps*.16),sequence=[{key:null,lyric:'',frame_length:pad}];
@@ -40,5 +48,22 @@ window.StairVoicevox=(()=>{
     for(let i=0;i<stem.length;i++)stem[i]*=gain;
     return stem;
   }
-  return {sing};
+  async function sing(song,score,notes,length,info){
+    const capabilities=info||await manifest();
+    const lead=await layer(song,score,notes,length,capabilities);
+    const chorus=song.chorus||song.n*.64,scale=StairGroove.minor(song)?[0,2,3,5,7,8,10]:[0,2,4,5,7,9,11];
+    const tonic=StairGroove.tonic(song);
+    const backing=notes.filter(n=>n.tick>=chorus*480).map(n=>{
+      // Move down a diatonic third; preserve the syllable and its original phrasing.
+      let pitch=n.m,steps=0;
+      while(steps<2){pitch--;if(scale.includes((pitch-tonic+120)%12))steps++;}
+      return {...n,m:pitch};
+    });
+    if(backing.length>=3){
+      const harmony=await layer(song,score,backing,length,capabilities),delay=Math.round(.014*StairSound.rate);
+      for(let i=delay;i<length;i++)lead[i]+=.27*harmony[i-delay];
+    }
+    return lead;
+  }
+  return {sing,manifest,band};
 })();

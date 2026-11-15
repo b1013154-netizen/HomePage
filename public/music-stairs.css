@@ -8,4 +8,4 @@
 #sheet-title{color:var(--mint)}#chord-chart{overflow-wrap:anywhere}#vocal-percent{display:inline-block;min-width:4em}
 @media print{#sheet .row{display:none}#sheet-title{color:black}}
 
-.featured-song{border-left:3px solid var(--mint)}.featured-song h2 span{font-size:.55em;color:#c8c0d1}.featured-song audio{width:min(100%,620px);display:block;margin-top:14px}.featured-song button[aria-pressed=true]{background:var(--mint);color:#14231e}#vv-help{margin:12px 0}
+#vv-help{margin:12px 0}
