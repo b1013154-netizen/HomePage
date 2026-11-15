@@ -55,6 +55,15 @@ const Workshop = (() => {
     for(const p of route){p.x+=offset(xs,7);p.y+=offset(ys,5);p.key=p.y*7+p.x;}
     return {name,goal,route,index};
   });
+  // Commission constraints describe observable results instead of a parts recipe.
+  for(const [name,start,dir,goal,target,conditions,brief,hint] of [
+    ['一坪の呼び鈴工場',15,0,0,17,{drive:'bell'},'部品を置けるのは一マスだけ。玉が通ると音を鳴らし、そのまま隣の呼び鈴を押す装置を発明しよう。','直進する入口と音板カムを組み、出口を右に向けましょう。'],
+    ['谷越え郵便局',14,0,2,18,{range:3},'机の割れ目を越えて旗まで届けよう。一台で三マス先に玉を送れる装置が必要です。','直進する入口とばね射出筒を選び、射程を3マスにしましょう。'],
+    ['角の向こうのお茶会',2,1,4,12,{range:3,drive:'bell'},'上から来る玉で音を鳴らし、角の向こうのやかんまで飛ばす一台を設計しよう。','下向きに進む玉を左折させると右向きに。音板カムと射程3のばねを組みましょう。']
+  ]){
+    const dock=start+dirs[dir][0]+7*dirs[dir][1];
+    plans.push({index:plans.length,name,goal,conditions,brief,hint,dock,route:[{type:'start',key:start,dir},{type:'goal',key:target,dir:0}]});
+  }
   return {plans,parts,goals,dirs};
 })();
 

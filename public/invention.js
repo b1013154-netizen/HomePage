@@ -7,7 +7,7 @@
   try {completed=new Set(JSON.parse(localStorage.getItem('workshop.solved')||'[]'))} catch {completed=new Set()}
   let plan,board,locked,pits,required,limit,tool='rail',run=null,motion=null,frame,sound;
   const triggered=new Map(), physics=WorkshopMotion;
-  const label=p=>p.type==='start'?'投入口':p.type==='goal'?goals[plan.goal]:parts[p.type][0];
+  const label=p=>p.design?p.design.name:p.type==='start'?'投入口':p.type==='goal'?goals[plan.goal]:parts[p.type][0];
   const say=s=>$('status').textContent=s;
   for(let k=0;k<35;k++){
     const b=document.createElement('button');b.type='button';b.onclick=()=>place(k);$('cells').append(b);buttons.push(b);
@@ -18,7 +18,7 @@
     const c=icon.getContext('2d');c.translate(32,32);art.draw(c,id);b.className='tool';b.append(icon,name);
     b.onclick=()=>selectTool(id);$('tools').append(b);tools.set(id,b);
   }
-  function selectTool(id){tool=id;for(const [key,b] of tools)b.setAttribute('aria-pressed',key===id);$('detail').textContent=parts[id][1]}
+  function selectTool(id){for(const b of $('designShelf').children)b.setAttribute('aria-pressed','false');tool=id;for(const [key,b] of tools)b.setAttribute('aria-pressed',key===id);$('detail').textContent=parts[id][1]}
   function options(){
     $('plans').replaceChildren(...plans.map((p,i)=>new Option((completed.has(i)?'✓　':'')+String(i+1).padStart(2,'0')+'　'+p.name,i)));
     $('plans').value=plan.index;$('count').textContent=completed.size+' / '+plans.length+' 件完成';
@@ -31,12 +31,20 @@
       if(endpoint||i===(plan.index<4?1:2)){board.set(p.key,{...p});locked.add(p.key)}
       if(p.type==='spring'){const [dx,dy]=dirs[p.dir];const gap=(p.y+dy)*7+p.x+dx;if(!plan.route.some(s=>s.key===gap))pits.add(gap)}
     });
+    if(plan.conditions){
+      limit=1;
+      if(plan.conditions.range===3){const target=plan.route[1].key;for(let k=plan.dock+1;k<target;k++)pits.add(k)}
+    }
     options();selectTool(plan.route.find(p=>!locked.has(p.key))?.type||'rail');
     $('title').textContent=plan.name;
     $('brief').textContent=['玉の力を借りて、作業室の呼び鈴を鳴らそう。','暗い書斎まで仕掛けをつないで、読書灯をともそう。','離れた机に実験開始の旗を揚げよう。','眠った羽根に勢いを届けて、風車を回そう。','火にかけたやかんに合図を届けて、湯気を立てよう。'][plan.goal];
     $('requirements').textContent='通す部品　'+Object.entries(required).map(([id,n])=>parts[id][0]+' ×'+n).join(' ／ ');
     $('hintText').hidden=true;$('hint').textContent='設計ヒントを見る';$('hintText').textContent=plan.route.slice(1,-1).map(p=>coordinate(p.key)+' '+label(p)+arrows[p.dir]).join('　→　');
-    $('next').hidden=true;say('投入口の矢印からスタート。ねじ留めされた部品は固定です。');sync();
+    if(plan.conditions){
+      $('brief').textContent=plan.brief;$('requirements').textContent='設置場所　'+coordinate(plan.dock)+' ／ 自作装置 1台';
+      $('hintText').textContent=plan.hint;
+    }
+    $('next').hidden=true;say(plan.conditions?'「装置を設計する」から試作して、金色のマスに置きましょう。':'投入口の矢印からスタート。ねじ留めされた部品は固定です。');sync();
   }
   function sync(){
     buttons.forEach((b,k)=>{const p=board.get(k);b.setAttribute('aria-label',coordinate(k)+' '+(p?label(p)+(p.type==='goal'?'':arrows[p.dir]):pits.has(k)?'机の溝':'空き')+(locked.has(k)?' 固定':''));});
@@ -46,10 +54,13 @@
     if(run)return;
     if(locked.has(k)||pits.has(k)){say(pits.has(k)?'ここは溝です。ばね台で飛び越えましょう。':'この部品はねじで固定されています。');return}
     const old=board.get(k);
+    if(plan.conditions&&k!==plan.dock){say('装置を置けるのは '+coordinate(plan.dock)+' です。');return}
+    if(plan.conditions&&typeof tool==='string'&&tool!=='erase'){say('この依頼には自作装置が必要です。「装置を設計する」か保存した設計図を選んでください。');return}
     if(tool==='erase')board.delete(k);
     else{
       if(!old&&board.size-2>=limit){say('部品数の上限です。「取り外す」で空きを作れます。');return}
-      board.set(k,{type:tool,dir:old?.type===tool?(old.dir+1)%4:0});
+      if(typeof tool==='object')board.set(k,{type:'device',design:tool,dir:old?.design?.id===tool.id?(old.dir+1)%4:0});
+      else board.set(k,{type:tool,dir:old?.type===tool?(old.dir+1)%4:0});
     }
     motion=null;triggered.clear();$('next').hidden=true;say(coordinate(k)+'　'+(board.has(k)?label(board.get(k))+arrows[board.get(k).dir]:'取り外しました。'));sync();
   }
@@ -72,8 +83,17 @@
     let failure='';
     if(!p)failure=coordinate(k)+(pits.has(k)?' の溝に玉が落ちました。':' で玉が止まりました。ここに部品を置いてみましょう。');
     else if(p.type==='goal'){
+      if(plan.conditions&&!run.qualified)failure='ゴールに届きました。依頼の機能を装置に組み込んでもう一度試しましょう。';
       const missing=Object.entries(required).filter(([id,n])=>(run.used[id]||0)<n);
       if(missing.length)failure='ゴールに到着！　あと '+missing.map(([id,n])=>parts[id][0]+' ×'+(n-(run.used[id]||0))).join('、')+' を経由しましょう。';
+    }else if(p.design){
+      const d=p.design;
+      if(run.visited.has(k)||p.dir!==(incoming+d.turn+4)%4)failure=coordinate(k)+' の入口の向きが合いません。装置を回して入口と投入口を合わせましょう。';
+      else{
+        for(const module of [d.intake,d.drive,d.output])run.used[module]=(run.used[module]||0)+1;
+        run.qualified=plan.conditions&&Object.entries(plan.conditions).every(([key,value])=>d[key]===value);
+        say(d.name+' が作動中　'+DeviceLab.describe(d));
+      }
     }else if(incoming!==null){
       const corner=['bend','lever'].includes(p.type);
       if(run.visited.has(k)|| (corner?(p.dir%2===incoming%2):p.dir!==incoming))failure=coordinate(k)+' の向きを確認しましょう。'+(corner?'曲がる部品は横から受け取ります。':'矢印の根元から玉を入れます。');
@@ -81,20 +101,20 @@
     }
     const type=failure&&p?.type!=='goal'?(pits.has(k)?'pit':'stop'):p.type;
     if(!failure){run.visited.add(k);triggered.set(k,incoming)}
-    Object.assign(run,{k,p,type,failure,incoming,dir:p?.dir??incoming,time:now,beat:0,duration:physics.lengths[type]});
-    motion={k,type,incoming,dir:run.dir,t:0};frame=requestAnimationFrame(tick);
+    Object.assign(run,{k,p,type,failure,incoming,dir:p?.dir??incoming,time:now,beat:0,duration:type==='device'?1250:physics.lengths[type]});
+    motion={k,type,incoming,design:p?.design,dir:run.dir,t:0};frame=requestAnimationFrame(tick);
   }
   function tick(now){
     if(!run)return;
     const {k,p,type}=run,t=Math.min(1,(now-run.time)/run.duration);
     motion.t=t;
-    const cues=physics.beats[type];
-    while(run.beat<cues.length&&t>=cues[run.beat]){tone(type,run.beat++);}
+    const cues=type==='device'?[.24,.42,.62]:physics.beats[type];
+    while(run.beat<cues.length&&t>=cues[run.beat]){const n=run.beat++;tone(type==='device'?[p.design.intake,p.design.drive,p.design.output][n]:type,n);}
     paint();
     if(t<1){frame=requestAnimationFrame(tick);return}
     if(run.failure){finish(run.failure);return}
     if(p.type==='goal'){finish('発明成功！　'+['呼び鈴が鳴り響きました。','読書灯がともりました。','合図の旗が揚がりました。','風車が回りました。','やかんから湯気が上がりました。'][plan.goal],true);return}
-    const [dx,dy]=dirs[p.dir],dist=p.type==='spring'?2:1,x=k%7+dx*dist,y=Math.floor(k/7)+dy*dist;
+    const [dx,dy]=dirs[p.dir],dist=p.design?p.design.range:p.type==='spring'?2:1,x=k%7+dx*dist,y=Math.floor(k/7)+dy*dist;
     if(x<0||x>=7||y<0||y>=5){finish('玉が作業台の端へ。最後の部品の矢印を確認しましょう。');return}
     enter(y*7+x,p.dir,now);
   }
@@ -110,7 +130,7 @@
     if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h}
     ctx.setTransform(w/(7*unit),0,0,h/(5*unit),0,0);
     ctx.clearRect(0,0,7*unit,5*unit);
-    const moving=motion&&physics.sample(motion.type,motion.dir,motion.incoming,motion.t);
+    const moving=motion&&(motion.type==='device'?DeviceLab.sample(motion.design,motion.dir,motion.t):physics.sample(motion.type,motion.dir,motion.incoming,motion.t));
     const marbles=[];
     function queue(k,list){for(const b of list)marbles.push({...b,x:(k%7+.5)*64+b.x,y:(Math.floor(k/7)+.5)*64+b.y})}
     for(let k=0;k<35;k++){
@@ -124,11 +144,15 @@
         hole.addColorStop(0,'#21140d');hole.addColorStop(.26,'#130f0c');hole.addColorStop(1,'#67412a');
         ctx.fillStyle=hole;ctx.beginPath();ctx.roundRect(5,16,54,33,4);ctx.fill();ctx.strokeStyle='#b18758';ctx.stroke();
       }
+      if(k===plan.dock){ctx.strokeStyle='#ffe4a0';ctx.lineWidth=2;ctx.strokeRect(2,2,60,60)}
       ctx.translate(32,32);
       if(p){
         const engaged=motion?.k===k&&motion.type===p.type;
         const spent=triggered.has(k);
-        art.draw(ctx,p.type,p.dir,engaged?moving.action:(spent&&p.type==='domino'?1:0),plan.goal);
+        if(p.design){
+          DeviceLab.draw(ctx,p.design,p.dir,engaged?moving.action:0);
+          ctx.textAlign='center';ctx.font='bold 7px sans-serif';ctx.fillStyle='#281d15e8';ctx.fillRect(-29,18,58,11);ctx.fillStyle='#fff1cb';ctx.fillText(p.design.name,0,26,54);
+        }else art.draw(ctx,p.type,p.dir,engaged?moving.action:(spent&&p.type==='domino'?1:0),plan.goal);
         if(!engaged&&(p.type==='domino'||p.type==='lever')){
           const state=physics.sample(p.type,p.dir,triggered.get(k),spent?1:0);
           queue(k,[state.balls[spent?0:1]]);
@@ -149,6 +173,11 @@
   }
   $('plans').onchange=e=>load(Number(e.target.value));$('reset').onclick=()=>load(plan.index);
   $('next').onclick=()=>load(plan.index+1);$('hint').onclick=()=>{const h=$('hintText');h.hidden=!h.hidden;$('hint').textContent=h.hidden?'設計ヒントを見る':'ヒントを閉じる'};
+  DeviceLab.init(d=>{
+    tool=d;for(const b of tools.values())b.setAttribute('aria-pressed','false');
+    $('detail').textContent=d.name+' ／ '+DeviceLab.describe(d);say(d.name+' を選択しました。作業台のマスを押して配置、もう一度押して回転します。');
+  });
+  $('commission').onclick=()=>{load(plans.findIndex(p=>p.conditions));$('openDesign').focus()};
   new ResizeObserver(paint).observe(canvas);load(0);
   art.ready.then(()=>{
     for(const [id,b] of tools){
