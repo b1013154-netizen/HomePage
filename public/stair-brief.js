@@ -43,7 +43,7 @@ window.StairBrief = (() => {
     const parts=s.lanes.filter(l=>!l.mute&&l.vol).map(l=>Ensemble.roles[l.role]+'（'+(l.role===3?'ドラム':Ensemble.voices[l.voice])+'）');
     const chords=StairNotation.model(s,score,0).cs.map(c=>c.label);
     const scene=scenes[s.brief?.preset]?.[0];
-    return [scene,s.brief?.raw,Ensemble.styles[s.genre][0]+'、'+s.tempo+' BPM、'+StairGroove.meters[s.meter||0].join('/')+'拍子、'+keys[StairGroove.key(s)]+(StairGroove.minor(s)?'マイナー':'メジャー')+'。',parts.join('、')+'で演奏。',chords.length?'コード進行 '+chords.join(' → ')+'。':'',s.sections?'構成 '+s.sections.map(x=>x.name).join(' → ')+'。':s.chorus?'Aメロからサビへ展開。':'約'+Math.ceil(s.n/StairGroove.bar(s))+'小節のフレーズ。',s.singing?.on?'日本語ボーカル。歌の旋律は楽器のリードと分け、語尾を伸ばし、フレーズの間に息継ぎを入れる。':'インストゥルメンタル。'].filter(Boolean).join('\n');
+    return [scene,s.brief?.raw,Ensemble.styles[s.genre][0]+'、'+s.tempo+' BPM、'+StairGroove.meters[s.meter||0].join('/')+'拍子、'+keys[StairGroove.key(s)]+(StairGroove.minor(s)?'マイナー':'メジャー')+'。',parts.join('、')+'で演奏。',StairPhrases.riff[s.riffStyle]?.name,s.singing?.on&&StairPhrases.vocal[s.singing.style]?.name,chords.length?'コード進行 '+chords.join(' → ')+'。':'',s.sections?'構成 '+s.sections.map(x=>x.name).join(' → ')+'。':s.chorus?'Aメロからサビへ展開。':'約'+Math.ceil(s.n/StairGroove.bar(s))+'小節のフレーズ。',s.singing?.on?'日本語ボーカル。歌の旋律は楽器のリードと分け、語尾を伸ばし、フレーズの間に息継ぎを入れる。':'インストゥルメンタル。'].filter(Boolean).join('\n');
   }
   return {scenes,create,describe};
 })();

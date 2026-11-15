@@ -1,8 +1,5 @@
 window.StairVocalScore=(()=>{
   const ppq=480;
-  // These contours describe sung phrases, independently of instrumental onsets.
-  const contours=[[0,0,2,4,4,2,0],[0,2,2,0,3,2,0],[2,2,0,-2,0,2,0],
-    [-2,0,0,2,5,4,2],[0,3,2,2,0,-2,0],[4,2,2,0,0,-2,0]];
   function phrases(text){
     return text.trim().split(/[、。！？!?.,\s]+/u).flatMap(line=>{
       const tokens=StairSinger.parse(line);
@@ -24,7 +21,9 @@ window.StairVocalScore=(()=>{
       const seed=(v.melodySeed??song.seed??0)>>>0;
       let state=seed;
       const random=()=>{state=(Math.imul(state,1664525)+1013904223)>>>0;return state/4294967296;};
-      const motif=Math.floor(random()*contours.length),mid=65+Math.floor(random()*5);
+      const style=StairPhrases.choose('vocal',song.genre,v.style,random);
+      const head=Math.floor(random()*4),answer=(head+1+Math.floor(random()*3))%4;
+      const mid=64+Math.floor(random()*6),seen=new Set();
       const start=Math.round(part.t*ppq),end=Math.round(Math.min(song.n,part.end)*ppq);
       const weights=lines.map(line=>line.length+2),total=weights.reduce((a,b)=>a+b,0);
       let used=0,begin=start;
@@ -39,9 +38,12 @@ window.StairVocalScore=(()=>{
         const pickup=Math.min(span*.10,ppq*([0,.25,.5][(seed+index)%3]));
         const breath=Math.min(ppq*.55,span*.12);
         const length=Math.min(span-pickup-breath,unit*(line.length+1.5));
-        const shape=contours[(motif+(index%2))%contours.length];
-        const rhythm=line.map((u,j)=>j===line.length-1?2.3:u.c==='っ'?.55:
-          [1,1,.75,1.25,1,.75][(j+seed%6)%6]);
+        const words=line.map(u=>u.c).join(''),repeated=seen.has(words);
+        seen.add(words);
+        const hook=repeated||index%2===0||song.chorus&&begin>=song.chorus*ppq;
+        const shape=style.patterns[hook?head:answer],pulse=hook?style.rhythm:style.answer;
+        const rhythm=line.map((u,j)=>j===line.length-1?(hook?2.6:1.45):u.c==='っ'?.55:
+          Number(pulse[j%pulse.length])*.72);
         const sum=rhythm.reduce((a,b)=>a+b,0);
         let elapsed=0,previous=mid;
         for(let j=0;j<line.length;j++){
@@ -58,7 +60,7 @@ window.StairVocalScore=(()=>{
           const chordRoot=actual?.root??tonic+root;
           const chord=(Ensemble.chords[actual?.q??q]?.[1]||[0,4,7]).slice(0,3);
           const pitchClasses=anchor?chord.map(d=>(chordRoot+d)%12):scale.map(d=>(tonic+d)%12);
-          const target=mid+shape[Math.round(j*(shape.length-1)/Math.max(1,line.length-1))]+(song.chorus&&t>=song.chorus?2:0);
+          const target=mid+shape[Math.round(j*(shape.length-1)/Math.max(1,line.length-1))]+(song.chorus&&t>=song.chorus?2:0)-(repeated&&j===line.length-1?3:0);
           let m=previous,best=Infinity;
           for(let pitch=59;pitch<=78;pitch++){
             if(!pitchClasses.includes(pitch%12))continue;
@@ -142,5 +144,5 @@ window.StairVocalScore=(()=>{
     for(let i=0;i<stem.length;i++)stem[i]*=gain;
     return stem;
   }
-  return {melody,midi,sing};
+  return {melody,midi,sing,chunks};
 })();

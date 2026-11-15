@@ -25,10 +25,15 @@ const motifs=[[4,7,9,7,4,2],[0,0,7,10,7,5],[11,14,12,9,7,4],[0,3,7,3],[4,7,9,7],
 function stockHarm(s,time){let t=time*4/StairGroove.bar(s),bar=Math.floor(t/4),p=harmony[s.genre];if(s.genre===2){let i=bar%4;return p[i<2?i:i===2?(t%4<2?2:3):(t%4<2?4:5)];}return p[bar%p.length];}
 function harm(s,time){let [r,q]=stockHarm(s,time),wasMinor=styles[s.genre][2]===1;if(StairGroove.minor(s)===wasMinor)return [r,q];const src=wasMinor?[0,2,3,5,7,8,10]:[0,2,4,5,7,9,11],dst=wasMinor?[0,2,4,5,7,9,11]:[0,2,3,5,7,8,10],d=src.indexOf(r);if(d<0)return [r,q];let third=(dst[(d+2)%7]-dst[d]+12)%12;return [dst[d],q===3?3:third===3?(q>=7?11:2):(q>=7?14:1)];}
 function protectedAt(s,t){return !!s.range&&t>=s.range[0]&&t<s.range[1];}
-function fill(s,li,keep){let l=s.lanes[li],r=l.role,pattern=patterns[s.genre][r],notes=[],old=l.steps||[],shift=Math.floor(Math.random()*3),spice=Math.random(),mot=motifs[s.genre],f=StairGroove.phrase(s.genre),measure=StairGroove.bar(s);
+function fill(s,li,keep){let l=s.lanes[li],r=l.role,pattern=patterns[s.genre][r],notes=[],old=l.steps||[],shift=Math.floor(Math.random()*3),spice=Math.random(),mot=motifs[s.genre],f=StairGroove.phrase(s.genre,s.riffStyle),measure=StairGroove.bar(s);
  for(let b=0;b<s.n;b+=measure){let entries=StairGroove.grid(s,r,b,pattern,f);if(l.density===1)entries=entries.filter((x,i)=>r===3?x.drum!==2:i%2===0);if(l.density===2){const unit=1/(measure*4);entries=entries.flatMap(x=>[x,{pos:x.pos+unit,drum:2,vel:.30}]).filter((x,i,a)=>x.pos<1&&a.findIndex(y=>Math.abs(y.pos-x.pos)<.001)===i).sort((a,b)=>a.pos-b.pos);}let pos=entries.map(x=>x.pos*16);
  pos.forEach((p,k)=>{let t=b+entries[k].pos*measure;if(t>=s.n||keep&&protectedAt(s,t))return;let [root,q]=harm(s,t),m=mot[(k+shift+(b%8?1:0))%mot.length],next=harm(s,b+measure)[0];
- let bass=s.genre===8?[0,4,7,(next-root+11)%12][k%4]:s.genre===2?(k===pos.length-1?(next-root+11)%12:[0,7,12,0,7][k%5]):[0,7,0,12][k%4];
+ let bass=s.genre===8?[0,4,7,(next-root+11)%12][k%4]:s.genre===2?(k===pos.length-1?(next-root+11)%12:[0,7,12,0,7][k%5]):f.walk[k%f.walk.length];
+ if(r===2&&k>0&&s.genre!==8&&s.genre!==2){
+ const intervals=chords[q]?.[1]||[0,4,7];
+ if(bass===3)bass=intervals[1]??4;
+ if(k===pos.length-1&&Math.floor(b/measure)%2===1)bass=((next-root+12)%12)+([0,2,4,5,7,9,11].includes((next+11)%12)?-1:-2);
+ }
  let drum=p%8===0?0:p%8===4?1:2;if(s.genre===3)drum=p===8?1:[0,7,11].includes(p)?0:2;if(s.genre===10)drum=p%4===0?0:2;
  if(r===0&&s.genre===11)m=[0,3,5,7,10][(k+shift)%5]-root;let off=r===2?bass:r===0?m:0;if(r===0&&s.genre===2){const hook=q===16?[10,13,12,10,7,4]:q===11?[10,14,12,7,3,2]:q===15?[9,14,12,10,7,4]:[11,14,12,9,7,4];off=hook[(k+shift)%6];} if(r===2&&k>0&&k<pos.length-1&&spice>.65)off+=12;if(r===3&&p%4===2&&spice>.7)drum=1;
  if(r===2&&k>0&&off>=12&&s.genre!==2)off=7;if(r===0)off=StairGroove.melody(f,b,k,entries[k].pos,root,q,chords[q]?.[1],s);if(r===3)drum=entries[k].drum;notes.push({t,d:r===3?drum:0,p:off,root,q,k:r===3?3:r===1?([4,5,9].includes(s.genre)?2:1):0,v:-1,vel:entries[k].vel??((p%4===0?1:.78)*(k%3===1?.88:1)),kit:!!entries[k].kit});});}
