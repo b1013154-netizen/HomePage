@@ -4,3 +4,5 @@
 .world-image.ink-world{background:repeating-linear-gradient(135deg,#403554 0 16px,#45395c 16px 32px);color:#fff1cb}.ink-icon{position:absolute;right:12%;top:17%;font:72px Georgia;line-height:1.25;border:3px solid #e9c29d;border-radius:10px;padding:0 10px;color:#f6d4ac;transform:rotate(12deg)}
 
 .world-image.chime-world{background:radial-gradient(ellipse at 77% 15%,#526e70,#263f51 50%,#172532);color:#f5d397}.chime-art{position:absolute;right:8%;top:12%;font:24px/1.15 Georgia;color:#dfc087}
+
+.world-image.invention-world{background:linear-gradient(0deg,#102822c9,transparent),url(/assets/invention-workshop.jpg) center/cover;color:#fff4d9}

@@ -1,0 +1,134 @@
+(() => {
+  const {plans,parts,goals,dirs}=Workshop, art=WorkshopArt;
+  const $=id=>document.getElementById(id), arrows=['→','↓','←','↑'];
+  const canvas=$('scene'), ctx=canvas.getContext('2d'), buttons=[], tools=new Map();
+  const coordinate=k=>'ABCDEFG'[k%7]+(Math.floor(k/7)+1);
+  let completed;
+  try {completed=new Set(JSON.parse(localStorage.getItem('workshop.solved')||'[]'))} catch {completed=new Set()}
+  let plan,board,locked,pits,required,limit,tool='rail',run=null,motion=null,frame,sound;
+  const triggered=new Set();
+  const label=p=>p.type==='start'?'投入口':p.type==='goal'?goals[plan.goal]:parts[p.type][0];
+  const say=s=>$('status').textContent=s;
+  for(let k=0;k<35;k++){
+    const b=document.createElement('button');b.type='button';b.onclick=()=>place(k);$('cells').append(b);buttons.push(b);
+  }
+  for(const [id,[name]] of Object.entries(parts)){
+    const b=document.createElement('button'), icon=document.createElement('canvas');
+    icon.width=icon.height=64;icon.setAttribute('aria-hidden','true');
+    const c=icon.getContext('2d');c.translate(32,32);art.draw(c,id);b.className='tool';b.append(icon,name);
+    b.onclick=()=>selectTool(id);$('tools').append(b);tools.set(id,b);
+  }
+  function selectTool(id){tool=id;for(const [key,b] of tools)b.setAttribute('aria-pressed',key===id);$('detail').textContent=parts[id][1]}
+  function options(){
+    $('plans').replaceChildren(...plans.map((p,i)=>new Option((completed.has(i)?'✓　':'')+String(i+1).padStart(2,'0')+'　'+p.name,i)));
+    $('plans').value=plan.index;$('count').textContent=completed.size+' / '+plans.length+' 件完成';
+  }
+  function load(index){
+    stop();plan=plans[index];board=new Map();locked=new Set();pits=new Set();required={};limit=plan.route.length-2;
+    plan.route.forEach((p,i)=>{
+      const endpoint=i===0||i===plan.route.length-1;
+      if(!endpoint)required[p.type]=(required[p.type]||0)+1;
+      if(endpoint||i===(plan.index<4?1:2)){board.set(p.key,{...p});locked.add(p.key)}
+      if(p.type==='spring'){const [dx,dy]=dirs[p.dir];const gap=(p.y+dy)*7+p.x+dx;if(!plan.route.some(s=>s.key===gap))pits.add(gap)}
+    });
+    options();selectTool(plan.route.find(p=>!locked.has(p.key))?.type||'rail');
+    $('title').textContent=plan.name;
+    $('brief').textContent=['玉の力を借りて、作業室の呼び鈴を鳴らそう。','暗い書斎まで仕掛けをつないで、読書灯をともそう。','離れた机に実験開始の旗を揚げよう。','眠った羽根に勢いを届けて、風車を回そう。','火にかけたやかんに合図を届けて、湯気を立てよう。'][plan.goal];
+    $('requirements').textContent='通す部品　'+Object.entries(required).map(([id,n])=>parts[id][0]+' ×'+n).join(' ／ ');
+    $('hintText').hidden=true;$('hint').textContent='設計ヒントを見る';$('hintText').textContent=plan.route.slice(1,-1).map(p=>coordinate(p.key)+' '+label(p)+arrows[p.dir]).join('　→　');
+    $('next').hidden=true;say('投入口の矢印からスタート。ねじ留めされた部品は固定です。');sync();
+  }
+  function sync(){
+    buttons.forEach((b,k)=>{const p=board.get(k);b.setAttribute('aria-label',coordinate(k)+' '+(p?label(p)+(p.type==='goal'?'':arrows[p.dir]):pits.has(k)?'机の溝':'空き')+(locked.has(k)?' 固定':''));});
+    $('budget').textContent='使用部品　'+(board.size-2)+' / '+limit;paint();
+  }
+  function place(k){
+    if(run)return;
+    if(locked.has(k)||pits.has(k)){say(pits.has(k)?'ここは溝です。ばね台で飛び越えましょう。':'この部品はねじで固定されています。');return}
+    const old=board.get(k);
+    if(tool==='erase')board.delete(k);
+    else{
+      if(!old&&board.size-2>=limit){say('部品数の上限です。「取り外す」で空きを作れます。');return}
+      board.set(k,{type:tool,dir:old?.type===tool?(old.dir+1)%4:0});
+    }
+    motion=null;triggered.clear();$('next').hidden=true;say(coordinate(k)+'　'+(board.has(k)?label(board.get(k))+arrows[board.get(k).dir]:'取り外しました。'));sync();
+  }
+  function stop(){cancelAnimationFrame(frame);triggered.clear();run=null;motion=null;$('run').textContent='▶　玉を放す'}
+  function tone(type){
+    if(!sound)return;
+    const t=sound.currentTime,osc=sound.createOscillator(),gain=sound.createGain();
+    const freq=({domino:165,lever:220,bell:880,spring:360,goal:660})[type]||115;
+    osc.frequency.setValueAtTime(freq,t);osc.frequency.exponentialRampToValueAtTime(type==='bell'||type==='goal'?freq*.99:freq*.55,t+.13);
+    gain.gain.setValueAtTime(.055,t);gain.gain.exponentialRampToValueAtTime(.0001,t+.32);osc.connect(gain).connect(sound.destination);osc.start(t);osc.stop(t+.33);
+  }
+  function finish(message,success=false){
+    run=null;$('run').textContent='▶　もう一度放す';say(message);
+    if(success){completed.add(plan.index);try{localStorage.setItem('workshop.solved',JSON.stringify([...completed]))}catch{}options();$('next').hidden=plan.index===plans.length-1}
+    paint();
+  }
+  function enter(k,incoming,now){
+    const p=board.get(k);
+    if(!p){finish(coordinate(k)+(pits.has(k)?' の溝に玉が落ちました。':' で玉が止まりました。ここに部品を置いてみましょう。'));return}
+    if(p.type==='goal'){
+      const missing=Object.entries(required).filter(([id,n])=>(run.used[id]||0)<n);
+      if(missing.length){finish('ゴールに到着！　あと '+missing.map(([id,n])=>parts[id][0]+' ×'+(n-(run.used[id]||0))).join('、')+' を経由しましょう。');return}
+    }else if(incoming!==null){
+      const corner=['bend','lever'].includes(p.type);
+      if(run.visited.has(k)|| (corner?(p.dir%2===incoming%2):p.dir!==incoming)){finish(coordinate(k)+' の向きを確認しましょう。'+(corner?'曲がる部品は横から受け取ります。':'矢印の根元から玉を入れます。'));return}
+      run.used[p.type]=(run.used[p.type]||0)+1;
+    }
+    run.visited.add(k);triggered.add(k);run.k=k;run.p=p;run.time=now;
+    run.duration=p.type==='domino'?850:p.type==='goal'?900:640;
+    motion={k,t:0};tone(p.type);frame=requestAnimationFrame(tick);
+  }
+  function tick(now){
+    if(!run)return;
+    const {k,p}=run,t=Math.min(1,(now-run.time)/run.duration);
+    motion={k,t};paint();
+    if(t<1){frame=requestAnimationFrame(tick);return}
+    if(p.type==='goal'){finish('発明成功！　'+['呼び鈴が鳴り響きました。','読書灯がともりました。','合図の旗が揚がりました。','風車が回りました。','やかんから湯気が上がりました。'][plan.goal],true);return}
+    const [dx,dy]=dirs[p.dir],dist=p.type==='spring'?2:1,x=k%7+dx*dist,y=Math.floor(k/7)+dy*dist;
+    if(x<0||x>=7||y<0||y>=5){finish('玉が作業台の端へ。最後の部品の矢印を確認しましょう。');return}
+    enter(y*7+x,p.dir,now);
+  }
+  $('run').onclick=()=>{
+    if(run){stop();paint();say('実験を止めました。部品を調整できます。');return}
+    try{sound??=new AudioContext();sound.resume().catch(()=>{})}catch{}
+    triggered.clear();run={visited:new Set(),used:{}};$('next').hidden=true;$('run').textContent='■　実験を止める';say('実験中…');enter(plan.route[0].key,null,performance.now());
+  };
+  function paint(){
+    if(!board)return;
+    const unit=64,w=Math.round(canvas.clientWidth*Math.min(devicePixelRatio,2)),h=Math.round(canvas.clientHeight*Math.min(devicePixelRatio,2));
+    if(!w||!h)return;
+    if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h}
+    ctx.setTransform(w/(7*unit),0,0,h/(5*unit),0,0);
+    for(let k=0;k<35;k++){
+      const x=k%7*unit,y=Math.floor(k/7)*unit,p=board.get(k);
+      ctx.save();ctx.translate(x,y);
+      const wood=ctx.createLinearGradient(0,0,64,64);wood.addColorStop(0,k%3?'#b8986d':'#ba9d74');wood.addColorStop(1,'#906b49');ctx.fillStyle=wood;ctx.fillRect(0,0,64,64);
+      for(let i=0;i<8;i++){ctx.beginPath();const a=(i*11+k*3)%63;ctx.moveTo(0,a);ctx.bezierCurveTo(20,a-3,40,a+2,64,a);ctx.strokeStyle='#67482029';ctx.lineWidth=.6;ctx.stroke()}
+      ctx.strokeStyle='#58402975';ctx.strokeRect(.5,.5,63,63);
+      ctx.font='7px monospace';ctx.fillStyle='#443b2d';ctx.fillText(coordinate(k),3,9);
+      if(pits.has(k)){ctx.fillStyle='#3a3029';ctx.fillRect(9,17,46,30);ctx.strokeStyle='#ceb287';ctx.strokeRect(9,17,46,30)}
+      ctx.translate(32,32);
+      if(p){
+        const held=triggered.has(k)&&['domino','start'].includes(p.type);
+        art.draw(ctx,p.type,p.dir,motion?.k===k?motion.t:(held?1:0),plan.goal);
+        if(locked.has(k)){ctx.fillStyle='#5a503b';ctx.beginPath();ctx.arc(25,-25,2.5,0,Math.PI*2);ctx.fill();ctx.fillStyle='#e6cf9e';ctx.fillRect(23,-25,4,1)}
+        if(p.type==='start'||p.type==='goal'){ctx.textAlign='center';ctx.font='bold 9px sans-serif';ctx.fillStyle='#312b20';ctx.fillText(label(p),0,27)}
+      }
+      ctx.restore();
+    }
+    if(motion){
+      const p=board.get(motion.k);if(!p||p.type==='goal')return;
+      const [dx,dy]=dirs[p.dir],jump=p.type==='spring',relay=p.type==='domino'||p.type==='lever';
+      const release=relay ? 0.56 : (jump ? 0.26 : 0);
+      const t=Math.max(0,(motion.t-release)/(1-release)),dist=(jump?2:1)*64*t;
+      const x=(motion.k%7+.5)*64+dx*dist,y=(Math.floor(motion.k/7)+.5)*64+dy*dist;
+      if(t>0||!release){ctx.fillStyle='#38281955';ctx.beginPath();ctx.ellipse(x+2,y+5,6,3,0,0,Math.PI*2);ctx.fill();art.ball(ctx,x,y-(jump?22*Math.sin(Math.PI*t):0),5.6)}
+    }
+  }
+  $('plans').onchange=e=>load(Number(e.target.value));$('reset').onclick=()=>load(plan.index);
+  $('next').onclick=()=>load(plan.index+1);$('hint').onclick=()=>{const h=$('hintText');h.hidden=!h.hidden;$('hint').textContent=h.hidden?'設計ヒントを見る':'ヒントを閉じる'};
+  new ResizeObserver(paint).observe(canvas);load(0);
+})();
