@@ -81,8 +81,8 @@ $('brief-preset').value=song.brief?.preset??-1;$('brief-text').value=song.brief?
 $('sing-on').onchange=()=>{stop();let v=vocalSettings();v.on=$('sing-on').checked;if(v.on&&!v.text.trim())v.text=singer.generate(v.theme);syncExtras();};
 $('lyric-theme').onchange=()=>vocalSettings().theme=+$('lyric-theme').value;
 $('sing-voice').onchange=()=>{stop();vocalSettings().voice=$('sing-voice').selectedIndex;};
-$('lyrics-roll').onclick=()=>{stop();remember();delete song.vocalParts;let v=vocalSettings();v.text=singer.generate(v.theme);v.reading='';v.on=true;sync();};
-for(const [id,k] of [['lyrics','text'],['reading','reading']])$(id).oninput=()=>{if(source)stop();delete song.vocalParts;vocalSettings()[k]=$(id).value;if($(id).value.trim()){vocalSettings().on=true;$('sing-on').checked=true;}updatePrompt(E.compose(song));$('sing-guide').textContent=vocalWarning()||'入力した歌詞を使用します。';};
+$('lyrics-roll').onclick=()=>{stop();remember();delete song.vocalParts;let v=vocalSettings();v.text=singer.generate(v.theme);v.reading='';sync();};
+for(const [id,k] of [['lyrics','text'],['reading','reading']])$(id).oninput=()=>{if(source)stop();delete song.vocalParts;vocalSettings()[k]=$(id).value;updatePrompt(E.compose(song));$('sing-guide').textContent=vocalWarning()||'入力した歌詞を使用します。';};
 $('resize-track').onclick=()=>{const n=+$('exact-count').value;if(!Number.isInteger(n)||n<1||n>160){msg('段数は1〜160の整数で入力してください。');return;}if(song.range)return;change(()=>{let l=lane(),old=l.steps,len=old.length;if(n===len)return;
  // Resample boundaries in musical time, interpolating only where new landings are needed.
  l.steps=Array.from({length:n},(_,j)=>{const p=j*len/n,i=Math.floor(p),x=old[i],end=old[i+1]?.t??song.n;return {...x,t:x.t+(end-x.t)*(p-i)};});sel=Math.min(sel,n-1);});};
@@ -92,7 +92,7 @@ for(const id of ['meter','tonality','mode'])$(id).onchange=()=>{if(song.range){m
 $('append').onclick=()=>{const saved=library[+$('library').value];if(!saved)return;try{let ring=$('cut-end').value==='ring',joined=StairSplice(song,saved,ring?song.n:+$('cut-end').value,+$('cut-start').value,ring);change(()=>{song=joined;sel=0;li=0;});$('export-status').textContent='曲を連結しました。「曲棚に追加」で別の曲として保存できます。';}catch(e){$('export-status').textContent=e.message;}};
 function cuts(){let saved=library[+$('library').value];for(let [id,src,end] of [['cut-end',song,true],['cut-start',saved,false]]){const el=$(id),previous=el.value,stamp=src?JSON.stringify([src.title,src.n,src.lanes.map(l=>l.steps.map(x=>x.t))]):'';if(el.dataset.stamp===stamp)continue;el.dataset.stamp=stamp;el.replaceChildren();if(!src)continue;const time=[...new Set([0,...src.lanes.flatMap(l=>l.steps.map(x=>x.t)),src.n])].sort((a,b)=>a-b);for(let t of time){if(end?t<=0:t>=src.n)continue;let bar=StairGroove.bar(src);el.add(new Option(t===src.n?'曲の末尾':t===0?'曲頭':(Math.floor(t/bar)+1)+'小節 / ＋'+Number((t%bar).toFixed(3))+'拍',t));}if(end)el.add(new Option('曲末の主音を1拍残して接続','ring'));el.value=[...el.options].some(o=>o.value===previous)?previous:String(end?src.n:0);}}
 $('library').onchange=cuts;$('cadence').onchange=()=>change(()=>song.cadence=!!$('cadence').selectedIndex);$('wave').onchange=()=>change(()=>song.waveOff=!!$('wave').selectedIndex);
-$('random-all').onclick=()=>change(()=>{let r=n=>Math.floor(Math.random()*n),s=E.fresh();s.genre=r(E.styles.length);s.key=r(12);s.minor=!!r(2);s.mood=s.minor?1:0;s.meter=r(5);s.tempo=Math.round(E.styles[s.genre][1]*(.85+Math.random()*.3));s.n=StairGroove.bar(s)*[3,4,6,8][r(4)];s.theme=r(4);s.material=r(4);s.view=r(2);s.cadence=!!r(2);s.title=['雨粒','水晶','白夜','潮風','青葉','月影','木星','真昼'][r(8)]+'の'+['散歩道','列車','光','遠まわり','しらべ','手紙'][r(6)];s.lanes=[];const roles=[0,1,2,3].filter((x,i)=>!i||Math.random()>.23);for(let role of roles){E.lane(s,role);let l=s.lanes.at(-1);l.voice=role===2?[7,12,8][r(3)]:r(E.voices.length);l.ball=r(E.balls.length);l.vol=55+r(41);l.density=r(3);E.fill(s,s.lanes.length-1,false);}s.curve=Array.from({length:5},()=>.55+Math.random()*.65);let theme=r(StairSinger.banks.length);s.singing={on:!!r(2),voice:r(3),theme,text:StairSinger.generate(theme),reading:''};song=s;li=sel=0;msg('新曲を生成しました。「合奏を再生」で波形と動きを見られます。');});
+$('random-all').onclick=()=>change(()=>{let r=n=>Math.floor(Math.random()*n),s=E.fresh();s.genre=r(E.styles.length);s.key=r(12);s.minor=!!r(2);s.mood=s.minor?1:0;s.meter=r(5);s.tempo=Math.round(E.styles[s.genre][1]*(.85+Math.random()*.3));s.n=StairGroove.bar(s)*[3,4,6,8][r(4)];s.theme=r(4);s.material=r(4);s.view=r(2);s.cadence=!!r(2);s.title=['雨粒','水晶','白夜','潮風','青葉','月影','木星','真昼'][r(8)]+'の'+['散歩道','列車','光','遠まわり','しらべ','手紙'][r(6)];s.lanes=[];const roles=[0,1,2,3].filter((x,i)=>!i||Math.random()>.23);for(let role of roles){E.lane(s,role);let l=s.lanes.at(-1);l.voice=role===2?[7,12,8][r(3)]:r(E.voices.length);l.ball=r(E.balls.length);l.vol=55+r(41);l.density=r(3);E.fill(s,s.lanes.length-1,false);}s.curve=Array.from({length:5},()=>.55+Math.random()*.65);let theme=r(StairSinger.banks.length);s.singing={on:false,voice:r(3),theme,text:StairSinger.generate(theme),reading:''};song=s;li=sel=0;msg('新曲を生成しました。「合奏を再生」で波形と動きを見られます。');});
 function updatePrompt(score){
  $('prompt-style').value=StairBrief.describe(song,score);
  $('prompt-lyrics').value=song.singing?.on?song.singing.text:'';
@@ -142,7 +142,7 @@ $('vocal-style').onchange=()=>change(()=>{
 });
 $('site-origin').textContent=location.origin;
 $('song-engine').onchange=()=>{stop();vocalSettings().engine=$('song-engine').value;syncExtras();$('vv-help').open=!$('vv-help').hidden;};
-song.singing={on:true,voice:0,theme:7,text:'よるのまちに\nきみのこえがひびく',reading:''};
+song.singing={on:false,voice:0,theme:7,text:'よるのまちに\nきみのこえがひびく',reading:''};
 sync();shelf();
 })();
 

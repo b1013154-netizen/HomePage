@@ -36,7 +36,7 @@ window.StairBrief = (() => {
     if(requested)s.lanes[0].voice=requested[1];
     const theme = StairSinger.banks.findIndex(b=>text.includes(b[0]));
     const lyricTheme = theme>=0?theme:suggested?.[2]??scene[2];
-    s.singing={on:!(/インスト|歌なし|歌声なし|ボーカルなし|歌詞なし/.test(text)), voice:0,theme:lyricTheme,text:StairSinger.generate(lyricTheme),reading:''};
+    s.singing={on:/(?:歌声|歌詞|ボーカル|歌)(?:あり|入り|付き|つき)|歌って|歌わせ/.test(text)&&!/インスト|歌なし|歌声なし|ボーカルなし|歌詞なし/.test(text), voice:0,theme:lyricTheme,text:StairSinger.generate(lyricTheme),reading:''};
     s.brief={preset,raw};return s;
   }
   function describe(s,score) {
