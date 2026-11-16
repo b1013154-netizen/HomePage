@@ -60,12 +60,12 @@ function openLibrary(replace=false){
  paintLibrary();$('library').showModal();
 }
 function replaceBody(kind,id,name){
- const index=pet.parts.findIndex(p=>p.role==='body' && (p.kind==='image'||p.kind==='fauna'));
+ const index=pet.parts.indexOf(baseAnimal());
  const base=index<0?initial().parts[0]:pet.parts[index];
  const oldName=base.kind==='image'?Art.names[base.id]:DoodleAtlas.species[base.id].name;
  const rename=!pet.name.trim()||pet.name===oldName;
  checkpoint(rename?name:undefined);
- const replacement={...base,kind,id};
+ const replacement={...base,kind,id,baseAnimal:true};
  if(index<0)pet.parts.unshift(replacement);else pet.parts[index]=replacement;
  if(rename)pet.name=name;
  choice=null;selected=replacement;save();renderPanel();say(name+'に変更しました。');
@@ -106,9 +106,62 @@ const flipButtons=['flipX','flipY'].map((axis,i)=>button(flipBar,['↔ 左右反
  if(!choice)save();
  syncFlip();
 }));
+function baseAnimal(){
+ return pet.parts.find(p=>p.baseAnimal)||pet.parts.find(p=>p.role==='body'&&['image','fauna'].includes(p.kind));
+}
+let partClipboard=null;
+function copyPart(){
+ if(!selected||choice||drag)return;
+ partClipboard=structuredClone(selected);delete partClipboard.baseAnimal;
+ syncFlip();say('コピーしました。「貼り付け」で配置できます。');
+}
+function pastePart(){
+ if(!partClipboard||drag)return;
+ choice=structuredClone(partClipboard);
+ choice.x=clamp(choice.x+16,0,840);choice.y=clamp(choice.y+16,0,490);
+ selected=null;renderPanel();say('コピーした部位を置く位置で離してください。');
+}
+function reorder(front){
+ const index=pet.parts.indexOf(selected);
+ if(index<0||choice||drag)return;
+ checkpoint();
+ const base=baseAnimal();if(base)base.baseAnimal=true;
+ pet.parts.splice(index,1);if(front)pet.parts.push(selected);else pet.parts.unshift(selected);
+ save();syncFlip();say(front?'最前面に移しました。':'最背面に移しました。');
+}
+const copyButton=button(flipBar,'コピー',copyPart);
+const pasteButton=button(flipBar,'貼り付け',pastePart);
+const frontButton=button(flipBar,'最前面へ',()=>reorder(true));
+const backButton=button(flipBar,'最背面へ',()=>reorder(false));
+const layerPicker=item('select',flipBar,'');
+layerPicker.setAttribute('aria-label','重なった部位を選択');
+layerPicker.onchange=()=>{selected=pet.parts[Number(layerPicker.value)];choice=null;tool='move';renderPanel()};
+function layerName(p){
+ if(p.kind==='line')return '手描き・'+roles[p.role];
+ if(p.kind==='image')return Art.names[p.id];
+ if(p.kind==='shape')return Art.shapes[p.id];
+ return (p.kind==='part'?DoodleAtlas.parts:DoodleAtlas.species)[p.id].name;
+}
+document.addEventListener('keydown',e=>{
+ if(tab!==0||$('library').open||drag||stroke||e.target.closest('input,textarea,select,[contenteditable=true]'))return;
+ if(e.key==='Escape'&&choice){choice=null;renderPanel();say('配置を取り消しました。');return}
+ if(!e.ctrlKey&&!e.metaKey)return;
+ const key=e.key.toLowerCase();
+ if(key==='c'&&selected&&!choice){e.preventDefault();copyPart()}
+ if(key==='v'&&partClipboard){e.preventDefault();pastePart()}
+});
 function syncFlip(){
  if(selected&&!pet.parts.includes(selected))selected=null;
- flipBar.hidden=tab!==0||!(choice||tool==='move'||selected);
+ flipBar.hidden=tab!==0||!(choice||tool==='move'||selected||partClipboard);
+ const index=pet.parts.indexOf(selected),locked=!!choice||!!drag;
+ copyButton.disabled=index<0||locked;pasteButton.disabled=!partClipboard||!!drag;
+ frontButton.disabled=index<0||index===pet.parts.length-1||locked;
+ backButton.disabled=index<1||locked;
+ layerPicker.disabled=!!drag||pet.parts.length===0;
+ layerPicker.replaceChildren();
+ const prompt=item('option',layerPicker,'重なった部位を選択',{value:''});prompt.disabled=true;
+ for(let i=pet.parts.length-1;i>=0;i--)item('option',layerPicker,(i+1)+' · '+layerName(pet.parts[i]),{value:String(i)});
+ layerPicker.value=index<0?'':String(index);
  flipButtons.forEach((b,i)=>{
    const target=choice||selected;
    b.disabled=!target||!!drag;
@@ -178,7 +231,7 @@ function evolve(){if(!pet.parts.length)return say('描画室で生物を描い�
 function care(k){if(!pet.parts.length)return say('描画室で生物を描いてください。');if(act)return say('いまの様子を少し見守ってください。');if(k==='play'&&pet.rest<10)return say('少し疲れています。休ませてあげましょう。');act={k,time:0,x:actor.x<420?630:200};say({feed:'木の実の匂いに気づいたようです。',play:'跳ねる種を追いかけています。',sleep:'目を閉じて、ゆっくり休んでいます。'}[k])}
 function endCare(){const k=act.k;pet.food=clamp(pet.food+(k==='feed'?20:k==='play'?-8:-2),0,100);pet.rest=clamp(pet.rest+(k==='sleep'?25:k==='play'?-10:2),0,100);pet.love+=k==='play'?3:1;act=null;save();renderPanel();say('世話の記録を保存しました。')}
 function frameOf(parts){let l=Infinity,t=Infinity,r=-Infinity,b=-Infinity;for(const p of parts){const v=bounds(p);l=Math.min(l,v[0]);t=Math.min(t,v[1]);r=Math.max(r,v[2]);b=Math.max(b,v[3])}if(!parts.length)l=t=r=b=0;return {l,t,r,b,cx:(l+r)/2,cy:(t+b)/2,scale:Math.min(2,150/Math.max(1,r-l),105/Math.max(1,b-t))}}
-function makeActor(x){return {x,y:280,vx:0,vy:0,dir:1,phase:0,bend:0,feet:new Map(),cool:0}}
+function makeActor(x){return {x,y:280,animationTime:0,vx:0,vy:0,dir:1,phase:0,bend:0,feet:new Map(),cool:0}}
 let actor=makeActor(395),rival=makeActor(620);
 function startBattle(){if(!pet.parts.length)return say('描画室で生物を描いてください。');actor=makeActor(210);rival=makeActor(630);rival.dir=-1;const hp=65+Math.min(70,pet.gen*6+pet.love);duel={hp,max:hp,enemy:72+enemyId%5*5,enemyMax:72+enemyId%5*5,done:false};renderPanel();say('対戦開始！')}
 const ground=x=>368+9*Math.sin(x/100)+4*Math.cos(x/42);
@@ -195,15 +248,18 @@ function landscape(mode){if(backdrops.has(mode))return backdrops.get(mode);const
  function frond(x,y,h,lean,col){g.save();g.translate(x,y);g.rotate(lean);Art.line(g,[[0,0],[1,-h*.48],[0,-h]],col,1.3);for(let j=1;j<10;j++){const yy=-h*j/10,len=h*(.24*Math.sin(j*Math.PI/11)+.02);for(const d of [-1,1])Art.oval(g,d*len*.65,yy-len*.45,len,len*.19,col,d===1?-.56:.56,false)}g.restore()}
  for(let j=0;j<(edit?13:65);j++){let x=random()*840;if(edit)x=j%2?random()*73:780+random()*72;let y=edit?510+random()*36:ground(x)+random()*123;frond(x,y,20+random()*(edit?94:65),(random()-.5)*1.1,edit?'#95ab91':['#536f5c','#69826a','#91a77d'][j%3])}
  for(let i=0;i<10000;i++){g.fillStyle=i%2?'#ffffff18':'#304b3610';g.fillRect(random()*840,random()*490,1,1)}backdrops.set(mode,c);return c}
-function traits(parts){let leg=0,wing=0,tail=0;for(const p of parts){if(p.role==='leg')leg++;if(p.role==='wing')wing++;if(p.role==='tail')tail++;if(p.kind==='fauna'){
- const gait=DoodleAtlas.species[p.id].gait;
- if(['walk','side','hop'].includes(gait))leg+=2;
- if(gait==='fly')wing++;
- if(['swim','pulse','slither'].includes(gait))tail++;
- }if(p.kind==='image'){const f=Math.floor(p.id/5);if([0,1,2,4].includes(f))leg+=Art.limbs(p.id);if(f===2)wing++;if([0,3,5].includes(f))tail++}}return {leg,wing,tail}}
+function traits(parts){let gait=null,leg=0,wing=0,tail=0;for(const p of parts){if(p.role==='leg')leg++;if(p.role==='wing')wing++;if(p.role==='tail')tail++;if(p.kind==='fauna'){
+ const speciesGait=DoodleAtlas.species[p.id].gait;
+ if(!gait||p.baseAnimal)gait=speciesGait;
+ if(['walk','side','hop'].includes(speciesGait))leg+=2;
+ if(speciesGait==='fly')wing++;
+ if(['swim','pulse','slither'].includes(speciesGait))tail++;
+ }if(p.kind==='image'){const f=Math.floor(p.id/5);if([0,1,2,4].includes(f))leg+=Art.limbs(p.id);if(f===2)wing++;if([0,3,5].includes(f))tail++}}return {leg,wing,tail,gait}}
 function motion(a,target,tr,dt,t,sleep=false,water=false){const dx=target-a.x,pace=sleep?0:Math.min(138,47+tr.leg*6+tr.wing*10+tr.tail*(water?14:2));const stride=tr.leg||tr.wing?1:.55+.4*Math.cos(a.phase);const desired=clamp(dx*1.8,-pace,pace)*stride,old=a.vx;a.vx+=(desired-a.vx)*(1-Math.exp(-dt*3));a.x=clamp(a.x+a.vx*dt,58,782);if(Math.abs(a.vx)>6)a.dir=Math.sign(a.vx);
  a.phase+=dt*(2+Math.abs(a.vx)*.071);a.bend+=((old-a.vx)*4-a.bend)*dt*7;const floor=ground(a.x)-38,wave=Math.sin(a.phase);
  const floating=water&&tr.tail>0;let targetY=floor+(sleep?4:0)- (floating?38+Math.sin(t*2)*8:tr.wing?35+wave*11:Math.abs(wave)*Math.min(4,Math.abs(a.vx)*.07));
+ if(tr.gait==='hop'&&!sleep)targetY-=Math.max(0,Math.sin(a.phase))*Math.min(21,Math.abs(a.vx)*.25);
+ a.animationTime+=dt*(sleep ? .2 : .78+Math.min(.7,Math.abs(a.vx)/130));
  const lift=tr.wing&&!sleep?Math.max(0,-Math.cos(a.phase))*180:0;
  a.vy+=((targetY-a.y)*53-a.vy*11+110-lift)*dt;a.y+=a.vy*dt;if(a.y>floor+5){a.y=floor+5;a.vy=Math.min(0,a.vy)}a.cool=Math.max(0,a.cool-dt)}
 function planted(a,key,phase,homeX,homeY,scale){let s=a.feet.get(key);const swing=Math.sin(phase)>0;const fx=a.x+homeX*a.dir*scale;
@@ -232,16 +288,16 @@ function drawPart(g,p,t,pose){g.save();g.translate(p.x,p.y);g.scale(p.flipX?-1:1
  else if(p.kind==='shape')Art.shape(g,p.id,p.color);else{const legs=[],n=Art.limbs(p.id);if(a)for(let j=0;j<n;j++){const hx=(j%Math.ceil(n/2)-(Math.ceil(n/2)-1)/2)*22+(j>=n/2?4:-4),f=pose.f,s=f.scale*p.size,cx=(p.x-f.cx)/p.size,cy=(p.y-f.cy)/p.size;const e=planted(a,idx+'-'+j,phase+Math.PI*(j%2),cx+hx,cy+32,s);legs.push([clamp(e[0]-cx,hx-16,hx+16),e[1]-cy])}Art.specimen(g,p.id,t,{legs,bend:a?.bend||0,beat:a?wing:0})}}
  g.restore()}
 function renderActor(a,parts,t){if(!parts.length)return;const f=frameOf(parts);ctx.save();ctx.globalAlpha=.19;Art.oval(ctx,a.x,ground(a.x)+2,47,6,'#23493f',0,false);ctx.restore();
- ctx.save();ctx.translate(a.x,a.y);ctx.scale(a.dir,1);ctx.rotate(clamp(a.vx*.00043*a.dir+Math.sin(a.phase)*.021,-.12,.12));const body=traits(parts),crawl=(!body.leg && !body.wing) ? .075*Math.sin(a.phase) : 0;ctx.scale(f.scale*(1+crawl),f.scale*(1-crawl+Math.sin(t*3)*.008));ctx.translate(-f.cx,-f.cy);parts.forEach((p,i)=>drawPart(ctx,p,t,{a,f,i}));ctx.restore()}
+ ctx.save();ctx.translate(a.x,a.y);ctx.scale(a.dir,1);ctx.rotate(clamp(a.vx*.00043*a.dir+Math.sin(a.phase)*.021,-.12,.12));const body=traits(parts),crawl=(!body.gait && !body.leg && !body.wing) ? .075*Math.sin(a.phase) : 0;ctx.scale(f.scale*(1+crawl),f.scale*(1-crawl+(body.gait?0:Math.sin(t*3)*.008)));ctx.translate(-f.cx,-f.cy);parts.forEach((p,i)=>drawPart(ctx,p,t,{a,f,i}));ctx.restore()}
 function rivalParts(){return [{kind:enemyId>=30?'fauna':'image',id:enemyId>=30?enemyId-30:enemyId,role:'body',x:0,y:0,size:1}]}
 function tick(dt,t){if(tab===0)return;birth=Math.max(0,birth-dt);const tr=traits(pet.parts),op=rivalParts();let goal=420+220*Math.sin(t*.34);if(tab===3&&act){act.time+=dt;goal=act.k==='sleep'?actor.x:act.x;if(act.k==='sleep'?act.time>3:Math.abs(actor.x-goal)<20&&act.time>1.4)endCare()}
  if(tab===2)goal=duel&&!duel.done?rival.x:240;
  motion(actor,goal,tr,dt,t,act?.k==='sleep',pet.env==='water');
  if(tab===2){motion(rival,duel&&!duel.done?actor.x:600,traits(op),dt,t);if(duel&&!duel.done&&Math.abs(actor.x-rival.x)<84&&actor.cool<=0){duel.enemy=Math.max(0,duel.enemy-Math.round(10+Math.random()*8+Math.min(10,pet.gen)+Math.min(5,tr.leg*.4)));duel.hp=Math.max(0,duel.hp-Math.round(8+Math.random()*9+enemyId%5));actor.vx=-170;rival.vx=170;actor.vy=-65;rival.vy=-75;actor.cool=1.15;
  if(!duel.enemy||!duel.hp){duel.done=true;const win=duel.hp>duel.enemy;if(win)pet.wins++;save();renderPanel();say(win?'勝利！ '+subject()+'がフィールドを制しました。':duel.hp===duel.enemy?'引き分け！ お互いによく戦いました。':'今回は相手の勝ち。飼育や進化を試してみよう。')}}}}
-function paint(t){ctx.drawImage(landscape(tab===0?'paper':tab===2?'forest':pet.env),0,0);if(tab===0){pet.parts.forEach(p=>{if(p!==drag?.target)drawPart(ctx,p,0)});
+function paint(t){ctx.drawImage(landscape(tab===0?'paper':tab===2?'forest':pet.env),0,0);if(tab===0){pet.parts.forEach(p=>{drawPart(ctx,p===drag?.target?drag.preview:p,0)});
  const preview=drag?.preview||choice;
- if(preview){ctx.save();ctx.globalAlpha=.78;drawPart(ctx,preview,0);ctx.restore()}
+ if(preview&&!drag?.target){ctx.save();ctx.globalAlpha=.78;drawPart(ctx,preview,0);ctx.restore()}
  const focus=preview||selected;
  if(focus){const [l,y,r,b]=bounds(focus);ctx.save();ctx.setLineDash([5,5]);ctx.strokeStyle='#356d60';ctx.lineWidth=1.5;ctx.strokeRect(l-3,y-3,r-l+6,b-y+6);ctx.restore()}
  return}

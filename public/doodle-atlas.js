@@ -1,6 +1,7 @@
 'use strict';
 
 const DoodleAtlas = (() => {
+  const loops = [[51, 3024], [51, 3024], [51, 3024], [52, 3066], [51, 3024], [40, 2352], [34, 2016], [46, 2688], [44, 2562], [46, 2730], [51, 3024], [51, 3024], [51, 3024], [51, 3024], [51, 3024], [51, 3024], [51, 3024], [51, 3024], [51, 3024], [51, 3024], [51, 3024], [51, 3024], [34, 2016], [51, 3024], [51, 3024], [51, 3024], [51, 3024], [51, 3024], [17, 1008], [51, 3024], [51, 3024], [45, 2646], [44, 2562], [44, 2562], [31, 1806], [44, 2562], [51, 3024], [51, 3024], [51, 3024], [47, 2772], [51, 3024], [52, 3066], [51, 3024], [41, 2394], [51, 3024], [51, 3024], [51, 3024], [51, 3024]];
   const species = `
 1f418 ゾウ walk
 1f992 キリン walk
@@ -50,9 +51,11 @@ const DoodleAtlas = (() => {
 1f40c カタツムリ slither
 1f41b イモムシ crawl
 1f997 コオロギ hop
-  `.trim().split(/\r?\n/).map(row => {
+  `.trim().split(/\r?\n/).map((row,id) => {
     const [code, name, gait] = row.trim().split(' ');
-    return {name, gait, url: '/assets/doodle-fauna/' + code + '.svg'};
+    const base='/assets/doodle-motion/'+code;
+    const [frames,duration]=loops[id];
+    return {name,gait,frames,duration,url:base+'-still.webp',sheet:base+'.webp'};
   });
 
   // Each outline starts at the attachment joint. The second path describes
@@ -94,32 +97,53 @@ const DoodleAtlas = (() => {
   tail('孔雀の飾り尾','M0 0 Q-15 -26 -42 -30 Q-47 -25 -37 -17 Q-58 -22 -55 -12 Q-51 -6 -37 -6 Q-55 -3 -50 5 Q-29 13 0 0Z','M-5 -1 L-39 -26 M-6 0 L-49 -13 M-6 0 L-44 3 M-35 -23 Q-38 -29 -41 -25 Q-39 -20 -35 -23','#7eaf9c');
 
   const images = new Map();
-  function texture(id) {
-    if (!images.has(id)) {
+  function texture(url) {
+    if (!images.has(url)) {
       const image = new Image();
-      image.src = species[id].url;
-      images.set(id, image);
+      image.src = url;
+      images.set(url,image);
     }
-    return images.get(id);
+    return images.get(url);
   }
 
-  // Deform horizontal bands continuously so feet, fins and wing tips lag the trunk.
-  function animal(g,id,actor) {
-    const image = texture(id);
-    if (!image.complete || !image.naturalWidth) return;
-    const gait = species[id].gait, s = 92;
-    if (!actor) { g.drawImage(image,-46,-46,s,s); return; }
-    const phase=actor.phase, stride=Math.min(1,Math.abs(actor.vx)/55);
-    for(let y=0;y<32;y++) {
-      const u=(y+.5)/32, feet=Math.max(0,(u-.52)/.48);
-      let x=0, width=1, rise=0;
-      if(gait==='fly') width+=Math.sin(phase*1.7)*.17*(1-u);
-      else if(gait==='pulse') {width+=Math.sin(phase-u*2)*.12; x=Math.sin(phase-u*5)*feet*3}
-      else if(gait==='swim'||gait==='slither'||gait==='crawl') x=Math.sin(phase-u*3.6)*u*4;
-      else if(gait==='hop') {rise=-Math.max(0,Math.sin(phase))*8*stride; width+=Math.cos(phase)*feet*.1}
-      else {x=Math.sin(phase)*feet*4*stride; width+=Math.cos(phase)*feet*.08*stride}
-      g.drawImage(image,0,y*image.naturalHeight/32,image.naturalWidth,image.naturalHeight/32,x-s*width/2,rise-46+y*s/32,s*width,s/32+.32);
+  // Pixel coordinates from the unmirrored, 128px poses: hip line and
+  // division between the fore and hind legs. Birds use a single pair.
+  const walkRigs={
+    0:[86,69],1:[85,69],2:[83,75],3:[84,66],4:[87,66],5:[79,70],
+    7:[82,67],8:[84,71],9:[87,67],11:[96,69],13:[87,70],
+    19:[93,63],20:[77,61],22:[98,64],24:[97,59],25:[91,68],
+    28:[82,64],29:[81,62],42:[80,69]
+  };
+  function walkingPose(g,image,sx,sy,rig,phase,stride){
+    const [hip,divide]=rig;
+    g.drawImage(image,sx,sy,128,hip+2,0,0,128,hip+2);
+    for(let side=0;side<2;side++){
+      const left=side?divide:0,width=side?128-divide:divide;
+      const x=left+width*.53,knee=hip+(128-hip)*.50;
+      const cycle=phase+side*Math.PI;
+      g.save();g.translate(x,hip);g.rotate(Math.sin(cycle)*.33*stride);g.translate(-x,-hip);
+      g.drawImage(image,sx+left,sy+hip,width,knee-hip+1,left,hip,width,knee-hip+1);
+      g.translate(x,knee);g.rotate(Math.max(0,Math.cos(cycle))*.46*stride);g.translate(-x,-knee);
+      g.drawImage(image,sx+left,sy+knee,width,128-knee,left,knee,width,128-knee);
+      g.restore();
     }
+  }
+  function animal(g,id,actor) {
+    const speciesInfo=species[id],still=texture(speciesInfo.url);
+    const sheet=actor?texture(speciesInfo.sheet):null;
+    const playing=sheet?.complete&&sheet.naturalWidth;
+    const image=playing?sheet:still;
+    if(!image.complete||!image.naturalWidth)return;
+    const seconds=actor?.animationTime||0;
+    const frame=playing?Math.floor(seconds*1000/speciesInfo.duration*speciesInfo.frames)%speciesInfo.frames:0;
+    const sx=frame%8*128,sy=Math.floor(frame/8)*128;
+    g.save();
+    // Source poses look left. Positive world velocity faces right in the lab.
+    g.translate(46,-46);g.scale(-92/128,92/128);
+    const stride=actor?Math.min(1,Math.abs(actor.vx)/48):0;
+    if(walkRigs[id]&&stride>.06)walkingPose(g,image,sx,sy,walkRigs[id],actor.phase,stride);
+    else g.drawImage(image,sx,sy,128,128,0,0,128,128);
+    g.restore();
   }
 
   function part(g,id) {

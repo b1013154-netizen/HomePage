@@ -1,0 +1,1 @@
+Microsoft Fluent Emoji Animated. MIT License. Source revision daa0365c09795789ed2bc6e8b228c97736cb6669 at https://github.com/microsoft/fluentui-emoji-animated . Animations resampled into WebP frame sheets.
