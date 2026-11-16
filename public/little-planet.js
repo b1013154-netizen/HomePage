@@ -1,19 +1,10 @@
 (()=>{
   const $=id=>document.getElementById(id),key='playground.little-planet.v1',view=createPlanetView($('globe'));
-  const branches={
-    dry:['砂の眠り苔','根で歩く乾生樹','地下貯水都市'],
-    frost:['氷晶藻','氷床を透かす光虫','氷窟の灯火都市'],
-    steam:['熱泉菌の輪','煙をまとう浮遊クラゲ','蒸気塔の集落'],
-    ocean:['潮を染める藍藻','帆を張る海獣','潮流を渡る浮島都市'],
-    heavy:['地を這う石苔','六脚の岩角獣','環状の石造都市'],
-    light:['空に胞子をまく苔','気嚢をもつ翼魚','浮力帆の空中港'],
-    green:['水辺の光合成膜','森を運ぶ甲羅獣','河口の庭園都市']
-  };
   function blank(){return {seed:crypto.getRandomValues(new Uint32Array(1))[0],water:0,temp:18,gravity:1,age:0,years:0,stableYears:0,started:false,sites:[],drops:0,span:1000000,streak:0,branch:'',civil:false,finds:[],events:[{age:0,text:'乾いた岩の表面に、最初の一滴を待つ。'}]}}
   let s=blank(),timer=null;
   try{const d=JSON.parse(localStorage.getItem(key));if(d&&Number.isInteger(d.seed)&&Number.isFinite(d.age)&&d.age>=0&&Number.isFinite(d.water)&&Number.isFinite(d.temp)&&Number.isFinite(d.gravity)&&Array.isArray(d.finds)&&Array.isArray(d.events))s=d}catch{}
   const million=1000000,format=n=>n.toLocaleString('ja-JP')+'年';
-  const milestones=[2*million,4*million,7*million];
+
   s.years??=s.age*million;s.stableYears??=s.streak*million;s.started??=s.age>0;s.span??=million;
   s.sites??=s.site?[{site:s.site,amount:.5}]:[];s.drops??=s.sites.length;
   $('years').value=s.span;
@@ -92,13 +83,9 @@
     const old=s.years,b=environment();
     const found=[];s.years+=span;s.age=s.years/million;
     if(b!==s.branch){s.branch=b;s.stableYears=0;add(habitats[b]+'に環境が移り変わった。',old)}
-    const from=s.stableYears;s.stableYears=s.water?from+span:0;s.streak=s.stableYears/million;s.civil=s.stableYears>=milestones[2]&&s.water>0;
-    for(let i=0;i<milestones.length;i++){
-      const name=branches[b][i];
-      if(from<milestones[i]&&s.stableYears>=milestones[i]&&!s.finds.includes(name)){
-        s.finds.push(name);found.push(name);add(name+(i===2?'が築かれ、夜側に明かりがともった。':'を初めて観測した。'),old+milestones[i]-from);
-      }
-    }
+    s.stableYears=s.water?s.stableYears+span:0;s.streak=s.stableYears/million;
+    found.push(...LivingWorld.step(s,b,old,s.years,add));
+    s.civil=s.life.stage>=4&&s.water>0;
     const text=found.length?found.join('、')+'を観測。':!s.water?'地表は乾燥し、生命の成長は休止中。':habitats[b]+'の環境が続いた。';
     if(!found.length)add(text);
     report(format(old)+' → '+format(s.years),text);render();save();
@@ -109,16 +96,22 @@
   }
   function render(splash=false){
     for(const [id,,,,,unit] of settings){$(id).value=s[id];$(id).disabled=busy||(id==='water'&&!s.started);$(id+'Value').textContent=(id==='gravity'?s[id].toFixed(2):s[id])+unit}
-    const b=environment(),adapt=b===s.branch?s.stableYears:0;
-    $('era').textContent=!s.started?'岩石の時代':!s.water?'休眠の時代':adapt>=milestones[2]?'文明の時代':adapt>=milestones[1]?'多様な生命の時代':adapt>=milestones[0]?'芽生えの時代':'水の時代';
+    const b=environment(),l=LivingWorld.ensure(s);
+    $('era').textContent=!s.started?'岩石の時代':!s.water?'休眠の時代':['水の時代','群体の時代','群れの時代','知性の時代','集落の時代','文明の時代'][l.stage];
     $('epoch').textContent='着水から '+format(s.years);$('step').disabled=$('auto').disabled=busy||!s.started;
     $('pour').disabled=$('restart').disabled=busy;$('pour').textContent=busy?'着水を観測中…':'中央に一滴落とす';
-    const next=milestones.find(n=>n>adapt);
-    $('condition').textContent=!s.started?'惑星の好きな場所を長押しして離してください。長く押すほど大きなしずくになります。':!s.water?'もう一滴落とすと、水の循環が戻ります。':habitats[b]+'。'+(next?'あと'+format(next-adapt)+'この環境が続くと変化が起きます。':'文明が根づきました。');
-    $('events').replaceChildren(...s.events.map(e=>{const li=document.createElement('li'),time=document.createElement('time');time.textContent=format(e.year??e.age*million);li.append(time,String(e.text));return li}));
+    $('condition').textContent=!s.started?'惑星の好きな場所を長押しして離してください。周辺惑星は今から観測できます。':!s.water?'もう一滴落とすと、水の循環が戻ります。':habitats[b]+'。'+(l.stage<2?'保護する生息地を選ぶと、群れの姿が変わります。':l.stage<4?'時間を進めて、この星の生物の暮らしを観察しましょう。':l.path<0?'評議会が開かれました。「生命と文明」で将来の方針を選べます。':'周辺惑星に探査艇を送れます。');
+    renderLiving();
+    $('events').replaceChildren(...s.events.slice().sort((a,b)=>(b.year??b.age*million)-(a.year??a.age*million)).map(e=>{const li=document.createElement('li'),time=document.createElement('time');time.textContent=format(e.year??e.age*million);li.append(time,String(e.text));return li}));
     $('finds').replaceChildren(...(s.finds.length?s.finds:['まだ発見されていません']).map(n=>{const li=document.createElement('li');li.textContent=n;return li}));
-    view.update({...s,civil:s.civil&&adapt>=milestones[2]&&s.water>0},splash);
+    view.update({...s,civil:s.life.stage>=4&&s.water>0},splash);
   }
+  if(!s.life&&s.started){
+    LivingWorld.ensure(s);
+    const inherited=s.civil?Math.max(12*million,s.stableYears):s.stableYears;
+    LivingWorld.step(s,environment(),0,inherited,()=>{});
+  }
+  const renderLiving=LivingWorld.setup(()=>({s,b:environment(),busy}), (title,text)=>{add(text);report(title,text);render()},save);
   view.bind(pour);$('pour').onclick=()=>pour(view.center(),.45);
   for(const btn of document.querySelectorAll('[data-span]'))btn.onclick=()=>{$('years').value=btn.dataset.span;s.span=Number(btn.dataset.span);save()};
   $('years').onchange=()=>{if($('years').validity.valid&&$('years').value){s.span=Number($('years').value);save()}};

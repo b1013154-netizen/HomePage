@@ -89,6 +89,7 @@ function createPlanetView(canvas){
     const atm=c.createRadialGradient(x,y,R*.94,x,y,R*1.17);atm.addColorStop(0,'#7db9b57a');atm.addColorStop(.35,'#72a6a337');atm.addColorStop(1,'#61979800');c.fillStyle=atm;c.fillRect(x-R*1.18,y-R*1.18,R*2.36,R*2.36);
     c.save();c.translate(x,y);c.rotate(-.25);c.strokeStyle='#9bc2b83d';c.lineWidth=.8;c.beginPath();c.ellipse(0,0,R*1.39,R*.49,0,0,TAU);c.stroke();c.restore();
     c.drawImage(gpu?orbital.canvas:surface,x-R,y-R,2*R,2*R);
+    if(state.life?.stage&&state.water>0)drawColonies(now,x,y,R);
     if(press&&!press.moved&&press.target){
       const {nx,ny}=press.target,amount=Math.min(1,(now-press.time)/1300);
       const tx=x+nx*R,ty=y-ny*R;
@@ -96,6 +97,34 @@ function createPlanetView(canvas){
       c.strokeStyle='#d8fff2';c.lineWidth=2;c.beginPath();c.arc(x+nx*R,y-ny*R,11,-Math.PI/2,(-.5+2*Math.max(.08,amount))*Math.PI);c.stroke();
     }
     if(flight)drawPour(now,x,y,R);
+  }
+  // Project survey markers from the surface; occult colonies on the far side.
+  function drawColonies(now,cx,cy,R){
+    const l=state.life,clock=reduced.matches?0:now*.00055;
+    const base=state.sites[0]?.site||[1,0,0];
+    const longitude=Math.atan2(base[2],base[0]),latitude=Math.asin(base[1]);
+    for(let i=0;i<Math.min(11,2+l.stage*2);i++){
+      const roaming=l.stage>=2&&i%3!==0;
+      const lng=longitude+(i===0?0:i*2.4)+(roaming?.037*Math.sin(clock*.6+i):0)-yaw*TAU;
+      const lat=Math.max(-1.35,Math.min(1.35,latitude+Math.sin(i*2)*.52));
+      const a=Math.cos(lat)*Math.cos(lng),b=Math.sin(lat),depth=a*Math.cos(pitch)+b*Math.sin(pitch);
+      if(depth<.12)continue;
+      c.save();c.translate(cx+R*Math.cos(lat)*Math.sin(lng),cy-R*(b*Math.cos(pitch)-a*Math.sin(pitch)));
+      const scale=Math.min(1.6,R/150)*Math.sqrt(depth);c.scale(scale,scale);
+      c.lineWidth=.9;c.strokeStyle='#d4f3b9';c.fillStyle='#afd4ae';c.shadowColor='#274536';c.shadowBlur=2;
+      if(!roaming&&l.stage>=4){
+        for(let j=0;j<4;j++){const h=3+(j*7+i)%6;c.fillStyle=l.path===1?'#ca9169':'#98b0a4';c.fillRect(j*3-6,-h,2.7,h);c.fillStyle='#ffe7a4';c.fillRect(j*3-5.6,1-h,1,1)}
+        if(l.path===2){c.beginPath();c.moveTo(0,-8);c.lineTo(1,-14);c.stroke()}
+      }else if(roaming){
+        for(let j=0;j<3;j++){
+          const beat=Math.sin(clock*4+i+j),x=j*5-5,y=Math.sin(i+j)*3;
+          c.beginPath();c.ellipse(x,y,2,1.2,0,0,TAU);c.fill();c.beginPath();
+          if(l.form===2){c.moveTo(x-3,y+beat*2);c.lineTo(x,y);c.lineTo(x+3,y+beat*2)}
+          else{c.moveTo(x-1,y);c.lineTo(x-1+beat,y+2);c.moveTo(x+1,y);c.lineTo(x+1-beat,y+2)}c.stroke();
+        }
+      }else{for(let j=0;j<5;j++){c.beginPath();c.arc(Math.cos(j*2.2)*3,Math.sin(j*2.2)*2,1.2,0,TAU);c.fill()}}
+      c.restore();
+    }
   }
   function pipette(x,y,fill,alpha){
     c.save();c.globalAlpha=alpha;c.translate(x,y);c.rotate(.31);
