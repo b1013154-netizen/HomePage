@@ -22,9 +22,9 @@
    add('legend',field,name);
    const label=add('label',field,'用途の候補'),menu=add('select',label,'');
    menu.setAttribute('aria-label',name+'の用途の候補');
-   const choices=[everydayUses[id],'幸運のお守りにする','音を鳴らして合図する','大切な思い出として飾る'];
+   const groups=useGroups(id),choices=groups.flatMap(([,values])=>values);
    add('option',menu,'選択または自由記入',{value:''});
-   choices.forEach(value=>add('option',menu,value,{value}));
+   for(const [label,values] of groups){const group=add('optgroup',menu,'',{label});values.forEach(value=>add('option',group,value,{value}))}
    const custom=add('label',field,'用途の自由記入（任意）');
    const input=add('textarea',custom,'',{value:state.uses[id]||'',rows:2,placeholder:'例：祖父が毎朝、紅茶を混ぜるために使った'});
    input.setAttribute('aria-label',name+'の用途の自由記入');
@@ -53,19 +53,14 @@
  $('toDig').onclick=()=>change('dig');
  function interpretation(ids,positions,years){
    const cats=new Set(ids.map(id=>objects[id].category)),mode=ids.length===1?'single':Math.max(...positions.map(p=>p%3))-Math.min(...positions.map(p=>p%3))<=1&&Math.max(...positions.map(p=>Math.floor(p/3)))-Math.min(...positions.map(p=>Math.floor(p/3)))<=1?'cluster':positions.every(p=>Math.floor(p/3)===Math.floor(positions[0]/3))?'row':'spread';
-   const layout={single:'単独で安置された',cluster:'同じ一角に寄せて納められた',row:'一列に並べられた',spread:'離れた地点から出土した'}[mode];
-   const era=years===300?'現存する古い図版にも似た形が残る。':years===1000?'刻印は読めず、手に収まる形だけが手掛かりだ。':'当時の文字は失われ、輪郭と出土位置だけが残った。';
-   const records=ids.map((id,i)=>{const o=objects[id],other=objects[ids[(i+1)%ids.length]];
-     const relation=mode==='single'?'対になる品は見つからず、ひとつで儀式を完結できたらしい。':mode==='cluster'?other.name+'と同時に使う一組の道具だったと考えられる。':mode==='row'?'並び順は「'+other.myth+'」への受け渡しの手順を示すという。':'「'+other.myth+'」との距離が、かつての部屋の境界を示している。';
-     return {name:o.myth,text:layout+o.name+'。'+era+relation}
-   });
+   const records=ids.map(id=>({name:objects[id].myth}));
    const heading=mode==='single'?records[0].name+'展':({cluster:'ひと組の秘宝',row:'失われた行列',spread:'散らばった星座'})[mode]+' ― '+objects[ids[0]].theme;
    return {records,heading,mode,diversity:cats.size};
  }
  $('bury').onclick=()=>{if(!selected().length)return;
    if(state.show&&state.show.phase!=='closed'&&!confirm('進行中の発掘・展覧会を終了し、新しい品を埋めますか？ 未閉幕の展覧会はランキングに入りません。'))return;
    const ids=selected(),positions=state.cells.flatMap((v,i)=>v===null?[]:[i]),year=new Date().getFullYear()+state.years;
-   state.show={...interpretation(ids,positions,state.years),uses:ids.map(id=>(state.uses[id]||'').trim()),id:crypto.randomUUID?.()||Date.now().toString(36)+'-'+Math.random().toString(36).slice(2),ids,positions,year,period:state.period,dug:ids.map(()=>false),phase:'buried',day:0,visitors:0,points:0,seed:Math.floor(Math.random()*1e7),daily:[]};save();change('exhibit');
+   state.show={...interpretation(ids,positions,state.years),uses:ids.map(id=>(state.uses[id]||'').trim()),id:crypto.randomUUID?.()||Date.now().toString(36)+'-'+Math.random().toString(36).slice(2),ids,positions,year,years:state.years,period:state.period,dug:ids.map(()=>false),phase:'buried',day:0,visitors:0,points:0,seed:Math.floor(Math.random()*1e7),daily:[]};save();change('exhibit');
    say('砂に埋めた品が、'+state.years.toLocaleString('ja-JP')+'年後の地層から見つかりました。');
  };
  function displayExhibit(){
@@ -78,18 +73,24 @@
    }
    $('showTitle').textContent=s.heading;$('yearStamp').textContent='西暦 '+s.year+' 年';slot=0;
    const old=$('hall'),canvas=old.cloneNode(false);old.replaceWith(canvas);canvas.hidden=false;$('altHall').hidden=true;
-   try{scene=MuseumScene.gallery(canvas,s,i=>chooseSlot(i,true));scene.visitors(people);$('guests').setAttribute('aria-pressed',String(people))}catch(e){canvas.hidden=true;$('altHall').hidden=false;scene=null}
-   for(const id of ['overview','turn','near','far','guests'])$(id).disabled=!scene;
+   try{scene=MuseumScene.gallery(canvas,s,i=>chooseSlot(i,true),i=>chooseSlot(i,false),on=>$('tour').setAttribute('aria-pressed',String(on)));scene.visitors(people);$('guests').setAttribute('aria-pressed',String(people))}catch(e){canvas.hidden=true;$('altHall').hidden=false;scene=null}
+   $('tour').setAttribute('aria-pressed','false');
+   for(const id of ['tour','overview','turn','near','far','guests'])$(id).disabled=!scene;
    chooseSlot(0,false);report();lastTick=performance.now();
  }
  $('openShow').onclick=()=>{const s=state.show;if(s.phase!=='buried'||!s.dug.every(Boolean))return;s.phase='open';save();displayExhibit();say('開幕しました。展示室では約2秒で会期が1日進みます。')};
  function chooseSlot(i,focus){
    slot=i;const s=state.show,el=$('plates');el.replaceChildren();add('h3',el,'展示解説');
    s.records.forEach((r,j)=>btn(el,objects[s.ids[j]].name,()=>chooseSlot(j,true)).setAttribute('aria-pressed',String(j===i)));
-   add('h4',el,'埋設時に記録された用途');add('p',el,s.uses?.[i]||'記録なし',{className:'recorded-use'});add('h4',el,'未来の学芸員の解釈');add('strong',el,s.records[i].name);add('p',el,s.records[i].text);
+   add('h4',el,'埋設時に記録された用途');add('p',el,s.uses?.[i]||'記録なし',{className:'recorded-use'});const fact=specimenFacts[s.ids[i]];
+   add('h4',el,'標本台帳');add('p',el,'復元想定の最長辺 約'+fact.cm+' cm ／ '+fact.shape+'。展示模型は見やすい縮尺で表示。');
+   add('h4',el,'研究者の見解');for(const [name,text] of museumNotes(s,i)){const d=add('details',el,'',{className:'research-note',open:true});add('summary',d,name);add('p',d,text)}
+   if(s.phase==='closed')renderFates(el,[s.fates[i]]);
+
    if(scene&&focus)scene.focus(i);
    if(!scene){const alt=$('altHall');alt.replaceChildren();add('img',alt,'',{src:img(s.ids[i]),alt:objects[s.ids[i]].name});add('p',alt,'この環境では立体展示の見本画像を表示しています。')}
  }
+ $('tour').onclick=()=>scene?.tour();
  $('overview').onclick=()=>scene?.focus(null);$('turn').onclick=()=>scene?.turn();$('near').onclick=()=>scene?.zoom(.8);$('far').onclick=()=>scene?.zoom(1.25);
  $('guests').onclick=()=>{people=!people;scene?.visitors(people);$('guests').setAttribute('aria-pressed',String(people))};
  const fmt=n=>n.toLocaleString('ja-JP');
@@ -99,24 +100,30 @@
    const weekend=s.day%7>=5;const visitors=Math.round((32+rating*.48+random()*76+s.ids.length*7)*(weekend?1.55:1)*(1+Math.min(.5,s.day*.025)));
    s.day++;s.visitors+=visitors;s.points+=visitors*rating;s.daily.push(visitors);
    if(s.day>=s.period){
-     s.phase='closed';if(!state.history.some(h=>h.id===s.id))state.history.push({id:s.id,title:s.heading,period:s.period,visitors:s.visitors,rating:Math.round(s.points/s.visitors*10)/10});
+     s.phase='closed';s.fates=afterlives(s);if(!state.history.some(h=>h.id===s.id))state.history.push({id:s.id,title:s.heading,period:s.period,visitors:s.visitors,fates:s.fates,rating:Math.round(s.points/s.visitors*10)/10});
    }
+ }
+ function renderFates(el,entries){
+   add('h4',el,'展示品の後日譚');for(const item of entries){add('strong',el,item.name+' ／ '+item.route);add('p',el,'西暦'+item.year+'年。'+item.text)}
+ }
+ if(state.show?.phase==='closed'&&!state.show.fates){
+   state.show.fates=afterlives(state.show);const past=state.history.find(r=>r.id===state.show.id);if(past)past.fates=state.show.fates;save()
  }
  function report(){const s=state.show,el=$('report');el.replaceChildren();const closed=s.phase==='closed';
    add('small',el,(closed?'閉幕':'開催中')+'　'+s.day+' / '+s.period+' 日');el.append(document.createElement('br'));
    add('b',el,fmt(s.visitors)+' 人');add('span',el,'　評判 '+(s.visitors?(s.points/s.visitors).toFixed(1):'—')+' / 100');
    if(s.day)add('p',el,'直近1日の来館者 '+fmt(s.daily.at(-1))+' 人');
-   $('quote').textContent=s.day?'来館者の声　「'+['これを毎朝使っていたなんて。','並べ方まで記録してあって面白い。','本当は何に使ったのだろう。','この形、手に持ってみたくなる。'][s.day%4]+'」':'ドラッグで展示室を見回せます。品名を押すと近くで鑑賞できます。';
+   $('quote').textContent=s.day?'来館者の声　「'+['これを毎朝使っていたなんて。','並べ方まで記録してあって面白い。','本当は何に使ったのだろう。','研究者によって違う説があるのが面白い。'][s.day%4]+'」':'ドラッグで展示室を見回せます。品名を押すと近くで鑑賞できます。';
    $('skip').hidden=closed;$('again').textContent=closed?'ランキングを見る':'埋設室に戻る';
  }
- function advance(all=false){const s=state.show;if(!s||s.phase!=='open')return;do{daily(s)}while(all&&s.phase==='open');save();report();if(s.phase==='closed')say('閉幕しました。展覧会の成績をランキングに登録しました。')}
+ function advance(all=false){const s=state.show;if(!s||s.phase!=='open')return;do{daily(s)}while(all&&s.phase==='open');save();report();if(s.phase==='closed')chooseSlot(slot,false);if(s.phase==='closed')say('閉幕しました。展覧会の成績をランキングに登録しました。')}
  $('skip').onclick=()=>advance(true);$('again').onclick=()=>change(state.show.phase==='closed'?'rank':'dig');
  setInterval(()=>{if(room==='exhibit'&&!document.hidden&&state.show?.phase==='open'&&performance.now()-lastTick>=2000){advance();lastTick=performance.now()}},250);
  function ranking(){const box=$('chart');box.replaceChildren();document.querySelectorAll('#sort button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.sort===sortKey)));
    const rows=state.history.slice().sort((a,b)=>b[sortKey]-a[sortKey]||b.visitors-a.visitors);
    if(!rows.length){add('p',box,'展覧会が閉幕すると、会期中の成績がここに記録されます。');return}
    const table=add('table',box,''),head=table.createTHead().insertRow();for(const name of ['順位','展覧会','会期','総来客数','評判'])add('th',head,name);
-   const body=table.createTBody();rows.forEach((r,i)=>{const tr=body.insertRow();for(const v of [i+1,r.title,r.period+'日',fmt(r.visitors)+'人',r.rating.toFixed(1)])tr.insertCell().textContent=v});
+   const body=table.createTBody();rows.forEach((r,i)=>{const tr=body.insertRow();for(const v of [i+1,r.title,r.period+'日',fmt(r.visitors)+'人',r.rating.toFixed(1)])tr.insertCell().textContent=v;if(r.fates){const d=add('details',tr.cells[1],'');add('summary',d,'品物のその後');renderFates(d,r.fates)}});
  }
  document.querySelectorAll('#sort button').forEach(b=>b.onclick=()=>{sortKey=b.dataset.sort;ranking()});
  change(state.show&&state.show.phase!=='closed'?'exhibit':'dig');
