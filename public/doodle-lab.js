@@ -7,7 +7,7 @@ let pet;try{pet=JSON.parse(localStorage.getItem(key))}catch{}if(!pet||!Array.isA
 let tab=0,tool='pen',role='body',color='#51745a',size=2,choice=null,stroke=null,undo=[],redo=[],libType='fauna',enemyId=30,duel=null,act=null,birth=0;
 function say(msg){$('notice').textContent=msg}
 function save(){try{localStorage.setItem(key,JSON.stringify(pet))}catch{say('このブラウザに保存できません。')}}
-function checkpoint(){undo.push(structuredClone(pet.parts));if(undo.length>18)undo.shift();redo=[];syncTools()}
+function checkpoint(nameAfter){undo.push({parts:structuredClone(pet.parts),name:pet.name,nameAfter});if(undo.length>18)undo.shift();redo=[];syncTools()}
 function item(tag,parent,txt,props={}){const el=document.createElement(tag);el.textContent=txt;Object.assign(el,props);parent.append(el);return el}
 function button(parent,txt,fn,cls=''){let b=item('button',parent,txt,{className:cls});b.onclick=fn;return b}
 function select(parent,title,values,value,change){const l=item('label',parent,title),s=item('select',l,'');for(const [v,n] of values)item('option',s,n,{value:v});s.value=value;s.onchange=()=>change(s.value);return s}
@@ -24,9 +24,16 @@ const clearButton=toolbarIcon('白紙にする','M4 6h16 M9 6V3h6v3 M6 6l1 14h10
 });
 function historyStep(from,to,message){
  if(!from.length)return;
- to.push(structuredClone(pet.parts));pet.parts=from.pop();save();syncTools();say(message);
+ const entry=from.pop();
+ const restoreName=entry.nameAfter!==undefined && pet.name===entry.nameAfter;
+ to.push({parts:structuredClone(pet.parts),name:pet.name,nameAfter:restoreName?entry.name:undefined});
+ pet.parts=entry.parts;if(restoreName)pet.name=entry.name;
+ save();renderPanel();say(message);
 }
+const replaceButton=button($('viewTitle').parentElement,'生物を変更',()=>openLibrary(true),'primary');
+replaceButton.before($('generation'));
 function syncTools(){
+ replaceButton.hidden=tab!==0;
  toolsBar.hidden=tab!==0;undoButton.disabled=!undo.length;redoButton.disabled=!redo.length;clearButton.disabled=!pet.parts.length;
 }
 function subject(){return pet.name.trim()||'名もなき生物'}
@@ -45,14 +52,32 @@ function renderPanel(){syncTools();const p=$('panel');p.replaceChildren();$('vie
  else{item('h2',p,'一緒に暮らす');item('p',p,'食べ物に駆け寄ったり、遊んだあとにひと眠り。世話をすると親密度が上がります。');for(const [k,n] of [['feed','木の実をあげる'],['play','一緒に遊ぶ'],['sleep','休ませる']])button(p,n,()=>care(k),k==='feed'?'primary':'');item('p',p,'満腹 '+pet.food+'　元気 '+pet.rest+'　親密度 '+pet.love)}
 }
 function change(i){tab=i;stroke=null;drag=null;choice=null;duel=null;act=null;actor=makeActor(395);Array.from($('tabs').children).forEach((b,j)=>b.setAttribute('aria-pressed',String(i===j)));renderPanel();say('')}
-function openLibrary(){paintLibrary();$('library').showModal()}
+let replacingBody=false;
+function openLibrary(replace=false){
+ replacingBody=replace;
+ if(replace)libType='fauna';
+ $('library').querySelector('h2').textContent=replace?'変更する生物を選ぶ':'標本素材庫';
+ paintLibrary();$('library').showModal();
+}
+function replaceBody(kind,id,name){
+ const index=pet.parts.findIndex(p=>p.role==='body' && (p.kind==='image'||p.kind==='fauna'));
+ const base=index<0?initial().parts[0]:pet.parts[index];
+ const oldName=base.kind==='image'?Art.names[base.id]:DoodleAtlas.species[base.id].name;
+ const rename=!pet.name.trim()||pet.name===oldName;
+ checkpoint(rename?name:undefined);
+ const replacement={...base,kind,id};
+ if(index<0)pet.parts.unshift(replacement);else pet.parts[index]=replacement;
+ if(rename)pet.name=name;
+ choice=null;save();renderPanel();say(name+'に変更しました。');
+}
 function paintLibrary(){const cats=$('categories'),items=$('items');cats.replaceChildren();items.replaceChildren();
  const books={fauna:['生物',DoodleAtlas.species.map(a=>a.name)],part:['部位',DoodleAtlas.parts.map(a=>a.name)],shape:['図形',Art.shapes],image:['旧標本',Art.names]};
  for(const [k,[label,names]] of Object.entries(books)){
+   if(replacingBody && k!=='fauna' && k!=='image')continue;
    button(cats,label+' '+names.length,()=>{libType=k;paintLibrary()}).setAttribute('aria-pressed',String(k===libType));
  }
  books[libType][1].forEach((name,id)=>{
-   const b=button(items,'',()=>{choice={kind:libType,id};$('library').close();info();say(name+'を配置する位置を押してください。')});
+   const b=button(items,'',()=>{if(replacingBody){$('library').close();replaceBody(libType,id,name);return}choice={kind:libType,id};$('library').close();info();say(name+'を配置する位置を押してください。')});
    if(libType==='fauna')item('img',b,'',{src:DoodleAtlas.species[id].url,alt:'',className:'fauna-thumb'});
    else if(libType==='image'){
      const thumb=item('span',b,'',{className:'specimen-thumb'});
