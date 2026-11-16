@@ -1,10 +1,18 @@
 function createPlanetView(canvas){
   const c=canvas.getContext('2d'),surface=document.createElement('canvas'),g=surface.getContext('2d');
-  const W=576,H=288,T=W*H,N=336,P=N*N,TAU=2*Math.PI;
+  let orbital=createOrbitalRenderer();
+  const W=1024,H=512,T=W*H,N=512,P=N*N,TAU=2*Math.PI;
   surface.width=surface.height=N;
   const img=g.createImageData(N,N),pixels=img.data,height=new Float32Array(T),mist=new Float32Array(T),grit=new Float32Array(T),colors=new Uint8ClampedArray(T*3),cities=new Uint8Array(T);
   const lon=new Float32Array(P),row=new Int32Array(P),light=new Float32Array(P),rim=new Float32Array(P);
-  let state,seed=-1,signature='',yaw=.15,pitch=.12,lastPitch=NaN,drag=null,drop=-3000;
+  let state,seed=-1,signature='',yaw=.15,pitch=.12,lastPitch=NaN,drag=null;
+  let basinKey='',basins;
+  let flight=null,press=null,onPour=()=>{},locked=false;
+  const radius=()=>Math.min(w*.335,h*.365);
+  function project(nx,ny){
+    const z=Math.sqrt(Math.max(0,1-nx*nx-ny*ny)),lat=Math.asin(ny*Math.cos(pitch)+z*Math.sin(pitch)),lng=Math.atan2(nx,z*Math.cos(pitch)-ny*Math.sin(pitch))+yaw*TAU;
+    return {nx,ny,lat:lat*180/Math.PI,site:[Math.cos(lat)*Math.cos(lng),Math.sin(lat),Math.cos(lat)*Math.sin(lng)]};
+  }
   let frame=0,last=0,w=0,h=0,visible=true;
   const reduced=matchMedia('(prefers-reduced-motion: reduce)');
   const mix=(a,b,t)=>a+(b-a)*t;
@@ -34,7 +42,8 @@ function createPlanetView(canvas){
   function texture(){
     const {water,temp,age,gravity}=state,sea=water===0?-1:.17+water*.0067;
     for(let k=0;k<T;k++){
-      const v=height[k],f=grit[k],lat=Math.abs((Math.floor(k/W)/H-.5)*2);
+      const lake=basins[(Math.floor(k/W)>>2)*256+((k%W)>>2)]/255*.38;
+      const v=height[k]-lake,f=grit[k],lat=Math.abs((Math.floor(k/W)/H-.5)*2);
       const local=temp-48*lat**2-50*Math.max(0,v-.6);
       let rgb;
       if(water&&local< -8)rgb=[174,201,203];
@@ -63,28 +72,61 @@ function createPlanetView(canvas){
     lastPitch=pitch;
   }
   function paint(now){
+    const R=radius(),x=w/2,y=h*.49;
+    const gpu=orbital&&orbital.draw(state,yaw,pitch,Math.max(64,Math.min(1600,Math.round(2*R*Math.min(devicePixelRatio,2)))),now,basins);
+    if(!gpu){
+    if(orbital){orbital=null;terrain(state.seed);texture()}
     if(lastPitch!==pitch)geometry();
     for(let p=0;p<P;p++){
       const off=p*4;if(row[p]<0){pixels[off+3]=0;continue}
       const k=row[p]+((Math.floor((lon[p]+yaw)*W)%W+W)%W),s=light[p],glow=rim[p],lamp=cities[k]&&s<.48?(1-s/.48)*195:0;
       pixels[off]=colors[k*3]*s+glow*97+lamp;pixels[off+1]=colors[k*3+1]*s+glow*166+lamp*.73;pixels[off+2]=colors[k*3+2]*s+glow*185+lamp*.28;pixels[off+3]=255;
     }
-    g.putImageData(img,0,0);c.clearRect(0,0,w,h);
+    g.putImageData(img,0,0);}
+    c.clearRect(0,0,w,h);
     for(let i=1;i<97;i++){const x=(Math.sin(i*94.1)*17453.5%1+1)%1*w,y=(Math.sin(i*56.7)*18362.3%1+1)%1*h;c.fillStyle='rgba(217,235,223,'+(.2+(i%7)/13)+')';c.fillRect(x,y,i%9===0?1.8:1,i%9===0?1.8:1)}
-    const R=Math.min(w*.335,h*.365),x=w/2,y=h*.49;
+
     const atm=c.createRadialGradient(x,y,R*.94,x,y,R*1.17);atm.addColorStop(0,'#7db9b57a');atm.addColorStop(.35,'#72a6a337');atm.addColorStop(1,'#61979800');c.fillStyle=atm;c.fillRect(x-R*1.18,y-R*1.18,R*2.36,R*2.36);
     c.save();c.translate(x,y);c.rotate(-.25);c.strokeStyle='#9bc2b83d';c.lineWidth=.8;c.beginPath();c.ellipse(0,0,R*1.39,R*.49,0,0,TAU);c.stroke();c.restore();
-    c.drawImage(surface,x-R,y-R,2*R,2*R);
-    const t=(now-drop)/1200;if(t>=0&&t<1){
-      const hitX=x-R*.25,hitY=y-R*.44;c.strokeStyle='#ccfff2';c.fillStyle='#bcf1ef';c.lineWidth=2;
-      c.beginPath();if(t<.48){const py=hitY-(1-(t/.48)**2)*R*.85;c.ellipse(hitX,py,3,7,0,0,TAU);c.fill()}else{const u=(t-.48)/.52;c.globalAlpha=1-u;c.ellipse(hitX,hitY,2+u*R*.41,1+u*R*.18,-.2,0,TAU);c.stroke();c.globalAlpha=1}
+    c.drawImage(gpu?orbital.canvas:surface,x-R,y-R,2*R,2*R);
+    if(press&&!press.moved&&press.target){
+      const {nx,ny}=press.target,amount=Math.min(1,(now-press.time)/1300);
+      const tx=x+nx*R,ty=y-ny*R;
+      pipette(tx-18,ty-Math.min(R*.92,ty-8)-9,amount,1);
+      c.strokeStyle='#d8fff2';c.lineWidth=2;c.beginPath();c.arc(x+nx*R,y-ny*R,11,-Math.PI/2,(-.5+2*Math.max(.08,amount))*Math.PI);c.stroke();
     }
+    if(flight)drawPour(now,x,y,R);
+  }
+  function pipette(x,y,fill,alpha){
+    c.save();c.globalAlpha=alpha;c.translate(x,y);c.rotate(.31);
+    const glass=c.createLinearGradient(-6,0,6,0);glass.addColorStop(0,'#bfecf1a0');glass.addColorStop(.23,'#ffffffc2');glass.addColorStop(.42,'#90bbc656');glass.addColorStop(1,'#d0f1f2ae');
+    c.fillStyle=glass;c.strokeStyle='#e2f4f5';c.lineWidth=.85;c.beginPath();c.moveTo(-6,-46);c.lineTo(-5,-12);c.lineTo(-1,0);c.lineTo(1,0);c.lineTo(5,-12);c.lineTo(6,-46);c.closePath();c.fill();c.stroke();
+    c.fillStyle='#74d5e8';c.beginPath();c.moveTo(-3.7,-12-23*fill);c.lineTo(3.7,-12-23*fill);c.lineTo(3,-12);c.lineTo(0,-4);c.lineTo(-3,-12);c.fill();
+    c.fillStyle='#8eaeaa';c.fillRect(-7,-50,14,5);c.fillStyle='#385951';c.beginPath();c.roundRect(-7,-70,14,21,5);c.fill();c.restore();
+  }
+  function drawPour(now,x,y,R){
+    const f=flight,elapsed=now-f.start,t=Math.min(1,elapsed/f.hitTime);
+    const tx=x+R*f.target.nx,ty=y-R*f.target.ny;
+    if(reduced.matches)return;
+    c.save();
+    if(t<1){
+      const travel=Math.max(0,(t-.26)/.74)**2,dist=Math.min(R*.92,ty-8),py=ty-dist*(1-travel);
+      const px=tx-18*(1-travel),size=4+f.amount*3;
+      pipette(tx-18,ty-dist-9,Math.max(0,1-t*1.7)*f.amount,Math.min(1,(1-t)*2));
+      c.translate(px,py);c.shadowColor='#a5f5ff';c.shadowBlur=11;
+      const grad=c.createLinearGradient(-size,0,size,0);grad.addColorStop(0,'#48a4c3');grad.addColorStop(.36,'#e6ffff');grad.addColorStop(1,'#348fa5');
+      c.fillStyle=grad;c.scale(Math.min(1,.4+t*2),Math.min(1,.4+t*2));c.beginPath();c.moveTo(0,-size*(1.65+t));c.bezierCurveTo(size*.1,-size*.5,size*1.1,0,size*.86,size*.65);c.bezierCurveTo(size*.5,size*1.7,-size*1.2,size*1.4,-size*.86,size*.3);c.quadraticCurveTo(-size*.5,-size*.55,0,-size*(1.65+t));c.fill();
+    }else{
+      const u=Math.min(1,(elapsed-f.hitTime)/1250);c.translate(tx,ty);c.rotate(-.22);
+      for(let i=0;i<3;i++){const a=(u-i*.13)/.74;if(a<=0||a>=1)continue;c.globalAlpha=(1-a)*.87;c.lineWidth=2.1-a;c.strokeStyle='#c3feff';c.beginPath();c.ellipse(0,0,3+R*.38*a,2+R*.19*a,0,0,TAU);c.stroke()}
+      for(let i=0;i<18;i++){const a=i*2.399,rad=R*(.14+.09*(i%4)/3)*u;c.globalAlpha=1-u;c.fillStyle='#cef8ff';c.beginPath();c.arc(Math.cos(a)*rad,Math.sin(a)*rad*.48-R*.2*4*u*(1-u),Math.max(.6,2*(1-u)),0,TAU);c.fill()}
+    }c.restore();
   }
   function loop(now){
     frame=0;if(!state||!visible||document.hidden)return;
-    if(!drag&&!reduced.matches)yaw+=Math.min(now-last,80)*.000009;
+    if(!drag&&!flight&&!reduced.matches)yaw+=Math.min(now-last,80)*.000009;
     last=now;paint(now);
-    if(!reduced.matches||now-drop<1200)frame=setTimeout(()=>{frame=0;wake()},55);
+    if(!reduced.matches||flight||press)frame=setTimeout(()=>{frame=0;wake()},flight||press?16:40);
   }
   function wake(){if(!frame)requestAnimationFrameOnce()}
   let pending=false;
@@ -92,9 +134,28 @@ function createPlanetView(canvas){
   function resize(){const r=canvas.getBoundingClientRect();w=r.width;h=r.height;const d=Math.min(devicePixelRatio,2);canvas.width=Math.round(w*d);canvas.height=Math.round(h*d);c.setTransform(d,0,0,d,0,0);wake()}
   new ResizeObserver(resize).observe(canvas);new IntersectionObserver(([e])=>{visible=e.isIntersecting;if(visible)wake()}).observe(canvas);
   document.addEventListener('visibilitychange',wake);
-  canvas.onpointerdown=e=>{drag=[e.clientX,e.clientY];canvas.setPointerCapture(e.pointerId)};
-  canvas.onpointermove=e=>{if(!drag)return;yaw-=(e.clientX-drag[0])/Math.max(200,w);pitch=Math.max(-1.4,Math.min(1.4,pitch+(e.clientY-drag[1])*.008));drag=[e.clientX,e.clientY];wake()};
-  canvas.onlostpointercapture=()=>drag=null;
-  canvas.onkeydown=e=>{if(!e.key.startsWith('Arrow'))return;e.preventDefault();yaw+=e.key==='ArrowRight'?-.04:e.key==='ArrowLeft'?.04:0;pitch=Math.max(-1.4,Math.min(1.4,pitch+(e.key==='ArrowUp'?.12:e.key==='ArrowDown'?-.12:0)));wake()};
-  return {update(s,splash=false){state=s;if(seed!==s.seed){seed=s.seed;terrain(seed);signature=''}const key=[s.water,s.temp,s.gravity,s.age>=1,s.age>=3,s.civil].join('/');if(signature!==key){signature=key;texture()}if(splash&&!reduced.matches)drop=performance.now();wake()}};
+  canvas.onpointerdown=e=>{
+    if(locked||press||e.button!==0)return;const r=canvas.getBoundingClientRect(),nx=(e.clientX-r.left-w/2)/radius(),ny=(h*.49-e.clientY+r.top)/radius();
+    press={id:e.pointerId,x:e.clientX,y:e.clientY,time:performance.now(),moved:false,target:nx*nx+ny*ny<.98?project(nx,ny):null};
+    drag=[e.clientX,e.clientY];canvas.setPointerCapture(e.pointerId);wake();
+  };
+  canvas.onpointermove=e=>{if(!press||e.pointerId!==press.id)return;
+    if(!press.moved&&Math.hypot(e.clientX-press.x,e.clientY-press.y)<6)return;
+    press.moved=true;yaw-=(e.clientX-drag[0])/Math.max(200,w);pitch=Math.max(-1.4,Math.min(1.4,pitch+(e.clientY-drag[1])*.008));drag=[e.clientX,e.clientY];wake()};
+  canvas.onpointerup=e=>{if(press?.id!==e.pointerId)return;const p=press;press=null;drag=null;if(!p.moved&&p.target)onPour(p.target,Math.min(1,(performance.now()-p.time)/1300));wake()};
+  canvas.onlostpointercapture=()=>{press=null;drag=null};
+  canvas.onkeydown=e=>{if(locked)return;if(e.key==='Enter'||e.key===' '){e.preventDefault();onPour(project(0,0),.3);return}if(!e.key.startsWith('Arrow'))return;e.preventDefault();yaw+=e.key==='ArrowRight'?-.04:e.key==='ArrowLeft'?.04:0;pitch=Math.max(-1.4,Math.min(1.4,pitch+(e.key==='ArrowUp'?.12:e.key==='ArrowDown'?-.12:0)));wake()};
+  return {
+    bind(fn){onPour=fn},
+    center(){return project(0,0)},
+    async pour(target,amount,impact){
+      locked=true;const hitTime=reduced.matches?80:940;flight={target,amount,start:performance.now(),hitTime};wake();
+      try{await new Promise(r=>setTimeout(r,hitTime));impact();await new Promise(r=>setTimeout(r,reduced.matches?100:1250))}
+      finally{locked=false;flight=null;wake()}
+    },
+    update(s){state=s;const id=s.seed+'/'+s.sites.length+'/'+s.drops;
+      if(id!==basinKey){basins=buildPlanetBasins(s.sites);basinKey=id}
+      if(seed!==s.seed){seed=s.seed;if(!orbital)terrain(seed);signature=''}
+      const key=[s.water,s.temp,s.gravity,s.age>=1,s.age>=3,s.civil,id].join('/');if(signature!==key){signature=key;if(!orbital)texture()}wake()}
+  };
 }
