@@ -4,3 +4,4 @@
 .flip-controls{display:flex;justify-content:center;gap:8px;padding:7px;background:#edf1e3}.flip-controls[hidden]{display:none}.flip-controls button{padding:5px 12px;font-size:13px}
 .flip-controls{flex-wrap:wrap;align-items:center}.flip-controls select{max-width:100%;font-size:13px;padding:5px 8px}.flip-controls button:disabled{opacity:.45;cursor:default}
 #items img.fauna-thumb{transform:scaleX(-1)}
+.evo-comparison{display:grid;grid-template-columns:1fr 1fr;gap:7px}.evo-comparison figure{margin:0;min-width:0;text-align:center;background:#eff2e5;border:1px solid #c2ceb8;border-radius:8px;overflow:hidden}.evo-comparison canvas{background:transparent}.evo-comparison figcaption{padding:2px;font-size:12px}.layout details{font-size:13px}.layout summary{cursor:pointer}.layout details p{margin-top:6px}#panel label select{min-width:0}
