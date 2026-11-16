@@ -2,6 +2,7 @@
   const path = location.pathname.replace(/\.html$/, '').replace(/\/$/, '').replace(/^\/index$/, '') || '/';
   const pages = [
     { url: '/', title: 'ホームページの遊び場', sub: 'すべての遊び場への入り口', icon: '⌂' },
+    { url: '/future-museum', title: '現代のものを未来で展示すると', sub: '日用品を埋めて未来の3D博物館へ', icon: '◇' },
     { url: '/doodle-lab', title: '落書き生物の進化実験', sub: '描いた命と遊び、進化を観察', icon: '✎' },
     { url: '/little-planet', title: '一滴から育つ、小さな惑星', sub: '環境を変えて生命と文明を育てる', icon: '◉' },
     { url: '/invention', title: 'へんてこ発明工房', sub: '部品をつないでからくり実験', icon: '⚙' },
