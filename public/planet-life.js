@@ -50,7 +50,7 @@ const LivingWorld=(()=>{
       if(z<=a)return;
       if(!s.water){if(l.population)l.population=Math.max(40,l.population*Math.exp(-(z-a)/(3*M)));return}
       const hadTown=l.stage>=4;let townYear=a;
-      const speed=(.81+(hash(s.seed)%37)/100)*(l.origin&&l.origin!==b ? .65 : 1)*(l.refuge>=0?1.13:1)*(1+l.returns.length*.08+l.returns.filter(i=>neighbors[i][3]===l.path).length*.12);
+      const speed=(.81+(hash(s.seed)%37)/100)*(l.origin&&l.origin!==b ? .65 : 1)*(l.refuge>=0?1.13:1)*(1+.06*PlanetArchive.count(l,0))*(1+l.returns.length*.08+l.returns.filter(i=>neighbors[i][3]===l.path).length*.12);
       const previous=l.progress;
       l.progress=Math.min(l.path<0?thresholds[3]:1000,previous+(z-a)/M*speed);
       while(l.stage<5&&l.progress>=thresholds[l.stage]){
@@ -64,7 +64,7 @@ const LivingWorld=(()=>{
         if(!s.finds.includes(name))s.finds.push(name);add(story,when);news.push(name);
       }
       if(hadTown||l.stage>=4){
-        const capacity=(l.origin===b?1:.34)*(50000+(hash(s.seed)%90000))*(1+l.returns.length*.18)*(l.path===1?2.2:l.path===0?1.5:1);
+        const capacity=(1+.10*PlanetArchive.count(l,1))*(l.origin===b?1:.34)*(50000+(hash(s.seed)%90000))*(1+l.returns.length*.18)*(l.path===1?2.2:l.path===0?1.5:1);
         const duration=(z-townYear)/M;
         const pop=l.population||600;
         l.population=capacity/(1+(capacity/pop-1)*Math.exp(-duration*.57));
@@ -92,7 +92,7 @@ const LivingWorld=(()=>{
     }
     $('scan').onclick=()=>{const {s}=get(),l=ensure(s),i=l.target;if(l.scans.includes(i))return;l.scans.push(i);const p=planet(s.seed,i);record(p.name+'を分光観測',p.data[1])};
     $('launch').onclick=()=>{const {s}=get(),l=ensure(s),i=l.target;if(l.stage<4||l.mission||!l.scans.includes(i)||l.returns.includes(i))return;
-      const p=planet(s.seed,i);l.mission={index:i,due:s.years+Math.round(Number(p.distance)*30000+45000)};record('探査艇が出発',p.name+'へ向かって観測船が離陸した。')};
+      const p=planet(s.seed,i);l.mission={index:i,due:s.years+Math.round((Number(p.distance)*30000+45000)/(1+.15*PlanetArchive.count(l,2)))};record('探査艇が出発',p.name+'へ向かって観測船が離陸した。')};
     function render(){
       const {s,b,busy}=get(),l=ensure(s),{h,animal,people,language}=info(s,b),p=planet(s.seed,l.target),scanned=l.scans.includes(l.target);
       const stage=l.stage;

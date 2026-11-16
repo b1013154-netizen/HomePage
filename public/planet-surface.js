@@ -6,7 +6,7 @@ function createPlanetView(canvas){
   const img=g.createImageData(N,N),pixels=img.data,height=new Float32Array(T),mist=new Float32Array(T),grit=new Float32Array(T),colors=new Uint8ClampedArray(T*3),cities=new Uint8Array(T);
   const lon=new Float32Array(P),row=new Int32Array(P),light=new Float32Array(P),rim=new Float32Array(P);
   let state,seed=-1,signature='',yaw=.15,pitch=.12,lastPitch=NaN,drag=null;
-  let basinKey='',basins;
+  let basinKey='',basins,siteList;
   let flight=null,press=null,onPour=()=>{},locked=false;
   const radius=()=>Math.min(w*.335,h*.365);
   function project(nx,ny){
@@ -183,7 +183,7 @@ function createPlanetView(canvas){
       finally{locked=false;flight=null;wake()}
     },
     update(s){state=s;const id=s.seed+'/'+s.sites.length+'/'+s.drops;
-      if(id!==basinKey){basins=buildPlanetBasins(s.sites);basinKey=id}
+      if(id!==basinKey||siteList!==s.sites){basins=buildPlanetBasins(s.sites);basinKey=id;siteList=s.sites;signature=''}
       if(seed!==s.seed){seed=s.seed;if(!orbital)terrain(seed);signature=''}
       const key=[s.water,s.temp,s.gravity,s.age>=1,s.age>=3,s.civil,id].join('/');if(signature!==key){signature=key;if(!orbital)texture()}wake()}
   };

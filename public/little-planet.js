@@ -3,6 +3,17 @@
   function blank(){return {seed:crypto.getRandomValues(new Uint32Array(1))[0],water:0,temp:18,gravity:1,age:0,years:0,stableYears:0,started:false,sites:[],drops:0,span:1000000,streak:0,branch:'',civil:false,finds:[],events:[{age:0,text:'乾いた岩の表面に、最初の一滴を待つ。'}]}}
   let s=blank(),timer=null;
   try{const d=JSON.parse(localStorage.getItem(key));if(d&&Number.isInteger(d.seed)&&Number.isFinite(d.age)&&d.age>=0&&Number.isFinite(d.water)&&Number.isFinite(d.temp)&&Number.isFinite(d.gravity)&&Array.isArray(d.finds)&&Array.isArray(d.events))s=d}catch{}
+  let archiveRecords=s.archive||[];
+  delete s.archive;
+  function latestArchive(){
+    const stored=localStorage.getItem(key);
+    return stored?(JSON.parse(stored).archive||[]):archiveRecords;
+  }
+  function records(){try{return latestArchive()}catch{return archiveRecords}}
+  function commit(current,rows){
+    try{localStorage.setItem(key,JSON.stringify({...current,archive:rows}));archiveRecords=rows;$('saved').textContent='このブラウザに保存済み';return true}
+    catch{$('saved').textContent='このブラウザでは保存できません';return false}
+  }
   const million=1000000,format=n=>n.toLocaleString('ja-JP')+'年';
 
   s.years??=s.age*million;s.stableYears??=s.streak*million;s.started??=s.age>0;s.span??=million;
@@ -30,7 +41,7 @@
     box.className='control';label.htmlFor=id;label.textContent=name;Object.assign(input,{id,type:'range',min,max,step});out.id=id+'Value';out.htmlFor=id;
     input.oninput=()=>{const prev=environment();s[id]=Number(input.value);if(environment()!==prev||!s.water){s.stableYears=0;s.streak=0;s.civil=false;s.branch=environment()}render();save()};box.append(label,out,input);$('knobs').append(box);
   }
-  function save(){try{localStorage.setItem(key,JSON.stringify(s));$('saved').textContent='このブラウザに保存済み'}catch{$('saved').textContent='このブラウザでは保存できません'}}
+  function save(){try{return commit(s,latestArchive())}catch{$('saved').textContent='このブラウザでは保存できません';return false}}
   function add(text,year=s.years){s.events.unshift({year,text});s.events=s.events.slice(0,40)}
   let clipURL=null,clipVersion=0;
   function recordLanding(){
@@ -99,9 +110,9 @@
     const b=environment(),l=LivingWorld.ensure(s);
     $('era').textContent=!s.started?'岩石の時代':!s.water?'休眠の時代':['水の時代','群体の時代','群れの時代','知性の時代','集落の時代','文明の時代'][l.stage];
     $('epoch').textContent='着水から '+format(s.years);$('step').disabled=$('auto').disabled=busy||!s.started;
-    $('pour').disabled=$('restart').disabled=busy;$('pour').textContent=busy?'着水を観測中…':'中央に一滴落とす';
+    $('pour').disabled=busy;$('pour').textContent=busy?'着水を観測中…':'中央に一滴落とす';
     $('condition').textContent=!s.started?'惑星の好きな場所を長押しして離してください。周辺惑星は今から観測できます。':!s.water?'もう一滴落とすと、水の循環が戻ります。':habitats[b]+'。'+(l.stage<2?'保護する生息地を選ぶと、群れの姿が変わります。':l.stage<4?'時間を進めて、この星の生物の暮らしを観察しましょう。':l.path<0?'評議会が開かれました。「生命と文明」で将来の方針を選べます。':'周辺惑星に探査艇を送れます。');
-    renderLiving();
+    renderLiving();renderArchive();
     $('events').replaceChildren(...s.events.slice().sort((a,b)=>(b.year??b.age*million)-(a.year??a.age*million)).map(e=>{const li=document.createElement('li'),time=document.createElement('time');time.textContent=format(e.year??e.age*million);li.append(time,String(e.text));return li}));
     $('finds').replaceChildren(...(s.finds.length?s.finds:['まだ発見されていません']).map(n=>{const li=document.createElement('li');li.textContent=n;return li}));
     view.update({...s,civil:s.life.stage>=4&&s.water>0},splash);
@@ -117,6 +128,23 @@
   $('years').onchange=()=>{if($('years').validity.valid&&$('years').value){s.span=Number($('years').value);save()}};
   $('years').required=true;
   $('auto').onclick=()=>toggleAuto(!timer);$('step').onclick=advance;
-  $('restart').onclick=()=>{if(!confirm('現在の惑星と日誌を手放して、新しい惑星を育てますか？'))return;toggleAuto(false);s=blank();clipVersion++;if(clipURL)URL.revokeObjectURL(clipURL);clipURL=null;$('watchLanding').hidden=true;$('report').hidden=true;$('years').value=s.span;$('restart').closest('details').open=false;render();save();$('pour').focus()};
+  function switchWorld(next,switching=false){
+    if(switching){
+      toggleAuto(false);clipVersion++;if(clipURL)URL.revokeObjectURL(clipURL);clipURL=null;
+      $('landingMovie').removeAttribute('src');$('downloadMovie').removeAttribute('href');
+      $('watchLanding').hidden=true;$('report').hidden=true;$('years').value=next.span;
+      $('starName').value=next.name||'';
+    }
+    s=next;LivingWorld.ensure(s);render();
+  }
+  const renderArchive=PlanetArchive.init({active:()=>s,records,commit,replace:switchWorld,locked:()=>busy});
+  function restart(same){
+    if(busy||!confirm((same?'この地形で育成を最初からやり直しますか？':'別の地形の惑星で始めますか？')+' 保管した星は残ります。現在の育成状態を残すには先に保管してください。'))return;
+    const next=blank();if(same){next.seed=s.seed;next.name=s.name}
+    LivingWorld.ensure(next);
+    if(!commit(next,records()))return;
+    switchWorld(next,true);$('archiveStatus').textContent=same?'同じ地形で育成をリセットしました。':'新しい地形の惑星が誕生しました。';
+  }
+  $('newStar').onclick=()=>restart(false);$('resetStar').onclick=()=>restart(true);
   render();save();
 })();
