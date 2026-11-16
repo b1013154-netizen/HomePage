@@ -4,6 +4,7 @@
  const img=id=>asset+'item-'+id+'.webp';
  function fresh(){return {cells:Array(9).fill(null),years:1000,period:7,show:null,history:[]}}
  let state=fresh();try{const stored=JSON.parse(localStorage.getItem(key));if(stored&&Array.isArray(stored.cells)&&stored.cells.length===9&&Array.isArray(stored.history))state=stored}catch{}
+ state.uses??={};
  let room='',selectedCell=null,scene=null,slot=0,people=true,sortKey='visitors',lastTick=0;
  function say(s){$('note').textContent=s}
  function save(){try{localStorage.setItem(key,JSON.stringify(state))}catch{say('このブラウザでは記録を保存できません。')}}
@@ -16,6 +17,22 @@
  function remove(id){state.cells[state.cells.indexOf(id)]=null;selectedCell=null;save();drawDig()}
  function toggle(id){const ids=selected();if(ids.includes(id)){remove(id);return}if(ids.length===3)return say('埋められるのは3品までです。入れ替える品をもう一度押してください。');
    const position=[4,3,5,0,1,2,6,7,8].find(i=>state.cells[i]===null);state.cells[position]=id;save();drawDig();say(objects[id].name+'を区画に置きました。')}
+ function usageEditor(parent,id){
+   const name=objects[id].name,field=add('fieldset',parent,'',{className:'usage-editor'});
+   add('legend',field,name);
+   const label=add('label',field,'用途の候補'),menu=add('select',label,'');
+   menu.setAttribute('aria-label',name+'の用途の候補');
+   const choices=[everydayUses[id],'幸運のお守りにする','音を鳴らして合図する','大切な思い出として飾る'];
+   add('option',menu,'選択または自由記入',{value:''});
+   choices.forEach(value=>add('option',menu,value,{value}));
+   const custom=add('label',field,'用途の自由記入（任意）');
+   const input=add('textarea',custom,'',{value:state.uses[id]||'',rows:2,placeholder:'例：祖父が毎朝、紅茶を混ぜるために使った'});
+   input.setAttribute('aria-label',name+'の用途の自由記入');
+   menu.value=choices.includes(input.value)?input.value:'';
+   menu.onchange=()=>{input.value=menu.value;state.uses[id]=input.value;save();if(!menu.value)input.focus()};
+   input.oninput=()=>{state.uses[id]=input.value;menu.value=choices.includes(input.value)?input.value:'';save()};
+   btn(field,'この品を外す',()=>remove(id));
+ }
  function drawDig(){const list=$('catalog'),plot=$('plot'),contents=$('contents');list.replaceChildren();plot.replaceChildren();contents.replaceChildren();const ids=selected(),term=$('search').value.trim();
    const found=objects.filter(o=>($('group').value==='all'||o.category===Number($('group').value))&&o.name.includes(term));
    if(!found.length)add('p',list,'該当する品物がありません。');
@@ -24,7 +41,7 @@
      if(selectedCell===null){if(state.cells[i]===null)return say('先に動かしたい品物の区画を押してください。');selectedCell=i;say('移動先の区画を押してください。')}
      else{[state.cells[selectedCell],state.cells[i]]=[state.cells[i],state.cells[selectedCell]];selectedCell=null;save();say('配置を更新しました。')}drawDig()
    });b.setAttribute('aria-label','区画'+(i+1)+' '+(id===null?'空き':name));b.setAttribute('aria-pressed',String(i===selectedCell))});
-   for(const id of ids)btn(contents,objects[id].name+' ×',()=>remove(id));$('bury').disabled=!ids.length;
+   for(const id of ids)usageEditor(contents,id);$('bury').disabled=!ids.length;
  }
  $('group').onchange=$('search').oninput=drawDig;
  function change(r){if(scene){scene.close();scene=null}
@@ -48,7 +65,7 @@
  $('bury').onclick=()=>{if(!selected().length)return;
    if(state.show&&state.show.phase!=='closed'&&!confirm('進行中の発掘・展覧会を終了し、新しい品を埋めますか？ 未閉幕の展覧会はランキングに入りません。'))return;
    const ids=selected(),positions=state.cells.flatMap((v,i)=>v===null?[]:[i]),year=new Date().getFullYear()+state.years;
-   state.show={...interpretation(ids,positions,state.years),id:crypto.randomUUID?.()||Date.now().toString(36)+'-'+Math.random().toString(36).slice(2),ids,positions,year,period:state.period,dug:ids.map(()=>false),phase:'buried',day:0,visitors:0,points:0,seed:Math.floor(Math.random()*1e7),daily:[]};save();change('exhibit');
+   state.show={...interpretation(ids,positions,state.years),uses:ids.map(id=>(state.uses[id]||'').trim()),id:crypto.randomUUID?.()||Date.now().toString(36)+'-'+Math.random().toString(36).slice(2),ids,positions,year,period:state.period,dug:ids.map(()=>false),phase:'buried',day:0,visitors:0,points:0,seed:Math.floor(Math.random()*1e7),daily:[]};save();change('exhibit');
    say('砂に埋めた品が、'+state.years.toLocaleString('ja-JP')+'年後の地層から見つかりました。');
  };
  function displayExhibit(){
@@ -69,7 +86,7 @@
  function chooseSlot(i,focus){
    slot=i;const s=state.show,el=$('plates');el.replaceChildren();add('h3',el,'展示解説');
    s.records.forEach((r,j)=>btn(el,objects[s.ids[j]].name,()=>chooseSlot(j,true)).setAttribute('aria-pressed',String(j===i)));
-   add('strong',el,s.records[i].name);add('p',el,s.records[i].text);
+   add('h4',el,'埋設時に記録された用途');add('p',el,s.uses?.[i]||'記録なし',{className:'recorded-use'});add('h4',el,'未来の学芸員の解釈');add('strong',el,s.records[i].name);add('p',el,s.records[i].text);
    if(scene&&focus)scene.focus(i);
    if(!scene){const alt=$('altHall');alt.replaceChildren();add('img',alt,'',{src:img(s.ids[i]),alt:objects[s.ids[i]].name});add('p',alt,'この環境では立体展示の見本画像を表示しています。')}
  }
