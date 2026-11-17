@@ -57,7 +57,14 @@
  Town.themes.forEach((a,i)=>option($('theme'),i,a[0]));for(let t=5;t<=15;t++)option($('tax'),t,t+'%');
  $('theme').onchange=()=>$('themeInfo').textContent=Town.themes[+$('theme').value][2];
  $('settings').onclick=()=>{$('name').value=city.name;$('theme').value=city.theme;$('tax').value=city.tax;$('free').checked=city.free;$('theme').onchange();$('setup').showModal()};
- $('apply').onclick=()=>{city.name=$('name').value.trim()||'こもれび商店街';city.theme=+$('theme').value;city.tax=+$('tax').value;city.free=$('free').checked;$('setup').close();palette();changed('街の設定を保存しました。')};
+ function readSettings(){city.name=$('name').value.trim()||'こもれび商店街';city.theme=+$('theme').value;city.tax=+$('tax').value;city.free=$('free').checked}
+ $('apply').onclick=()=>{readSettings();$('setup').close();palette();changed('街の設定を保存しました。')};
+ $('newTown').onclick=()=>{
+ if(!confirm('保存中の街を更地の新しい街に置き換えますか？'))return;
+ city=Town.start();city.buildings=[{x:0,y:9,id:0,s:1,paid:0}];city.zones={};city.pop=0;city.history=[0];
+ readSettings();simulationClock=0;group=0;id=0;mode='build';scale=1;
+ mapView.fit();$('setup').close();palette();changed('新しい街が誕生しました。入口の道路から通りを延ばしてください。')
+ };
  setInterval(()=>{if(paused||document.hidden||$('setup').open)return;simulationClock+=speed;if(simulationClock<7)return;simulationClock-=7;Town.day(city);hud();persist()},1000);
  palette();hud();say('道路沿いの空き区画に最初のお店を置こう。街の名前と方針は「街の設定」から。');
 })();
