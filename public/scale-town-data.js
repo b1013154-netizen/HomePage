@@ -9,6 +9,17 @@ const Town=(()=>{
  ['バス停','bus','#78a394',100,0,2,2,2,3],['診療所','clinic','#d1c6b4',220,0,8,3,3,3],['図書館','library','#a0806c',200,0,6,7,2,3],['学校','school','#d1b693',290,0,12,4,3,3],['交番','police','#879daf',145,0,4,2,2,3],['給水塔','tank','#8ea8ac',200,0,3,1,4,3],
  ['街角の公園','park','#87a785',65,0,0,7,1,4],['並木広場','grove','#6d9777',100,0,0,10,1,4],['ボタン噴水','button','#7ba6af',130,0,0,12,1,4],['屋台広場','market','#d49a59',145,0,7,9,0,4]
  ];
+ rows.push(
+ ['風車の製粉所','windmill','#cdaf85',220,0,12,6,0,1],
+ ['花時計広場','clockgarden','#b98699',140,0,2,12,2,4],
+ ['メリーゴーラウンド','carousel','#b96e65',360,0,16,16,1,4],
+ ['港の時計塔','clocktower','#b39178',480,0,8,18,4,3],
+ ['大観覧車','wheel','#859bb2',860,0,36,28,3,4]);
+ const milestones=[
+ {pop:50,ids:[34,11]}, {pop:100,ids:[35,12]}, {pop:180,ids:[36,13]},
+ {pop:300,ids:[37,15]}, {pop:500,ids:[38]}];
+ const required=id=>milestones.find(m=>m.ids.includes(id))?.pop||0;
+ const unlocked=(c,id)=>Math.max(c.peak||0,c.pop)>=required(id);
  const items=rows.map(([name,form,color,cost,homes,jobs,appeal,service,group],id)=>({id,name,form,color,cost,homes,jobs,appeal,service,group}));
  const themes=[['下町商店街','#e7ba87','個人商店の売上 +15%'],['緑のガーデンタウン','#a3c8a2','緑地による満足度 +25%'],['ネオン横丁','#bb97c4','飲食・娯楽店の売上 +25%'],['駅前都市','#8ab3ce','集合住宅の収容人数 +15%']];
  const sizes=[{name:'ミニ',n:1,fac:.58,draw:.65},{name:'標準',n:1,fac:1,draw:.87},{name:'巨大',n:2,fac:2.6,draw:1.64},{name:'超巨大',n:3,fac:5.1,draw:2.52}];
@@ -38,10 +49,10 @@ const Town=(()=>{
  const housing=type==='home';
  if(housing?s.homes>c.pop*1.5+20:s.jobs>c.pop*.85+15)continue;
  const choices=housing?[19,20,21,23]:[2,3,4,5,6,7,8,9,10,11,16,17,18];
- const b={x,y,s:1,id:choices[(x*3+y+c.day+c.theme)%choices.length],paid:0};
+ const allowed=choices.filter(id=>unlocked(c,id));const b={x,y,s:1,id:allowed[(x*3+y+c.day+c.theme)%allowed.length],paid:0};
  if(!access(b,s.net))continue;
  c.buildings.push(b);return;
  }}
- function day(c){let s=stats(c);develop(c,s);s=stats(c);c.cash+=s.balance;c.pop+=Math.sign(s.target-c.pop)*Math.min(Math.abs(s.target-c.pop),Math.ceil(Math.abs(s.target-c.pop)*.19));c.day++;c.history.push(c.pop);if(c.history.length>24)c.history.shift()}
- return {N,groups,items,themes,sizes,start,index,key,stats,price,valid,day};
+ function day(c){let s=stats(c);develop(c,s);s=stats(c);c.cash+=s.balance;c.pop+=Math.sign(s.target-c.pop)*Math.min(Math.abs(s.target-c.pop),Math.ceil(Math.abs(s.target-c.pop)*.19));c.peak=Math.max(c.peak||0,c.pop);c.day++;c.history.push(c.pop);if(c.history.length>24)c.history.shift()}
+ return {milestones,required,unlocked,N,groups,items,themes,sizes,start,index,key,stats,price,valid,day};
 })();

@@ -11,7 +11,7 @@ function townMap(canvas,api){
  function zoneCells(a,b){
  const cells=[];for(let x=Math.max(0,Math.min(a.x,b.x));x<=Math.min(N-1,Math.max(a.x,b.x));x++)
  for(let y=Math.max(0,Math.min(a.y,b.y));y<=Math.min(N-1,Math.max(a.y,b.y));y++)cells.push({x,y});return cells}
- function setZoom(k){zoom=Math.max(.53,Math.min(3,zoom*k))}
+ function setZoom(k){zoom=Math.max(.53,Math.min(5,zoom*k))}
  canvas.onwheel=e=>{e.preventDefault();setZoom(e.deltaY>0?.88:1.14)};
  canvas.oncontextmenu=e=>e.preventDefault();canvas.onpointerdown=e=>{
  if(drag)return;const start=cell(e);drag={id:e.pointerId,start,last:start,moving:api.mode()==='hand'||e.button===2||e.shiftKey,cx:e.clientX,cy:e.clientY};hover=start;canvas.setPointerCapture(e.pointerId)};
@@ -23,13 +23,13 @@ function townMap(canvas,api){
  let routes=[],oldNet=null;
  function traffic(net){if(oldNet===net)return;oldNet=net;routes=[];
  const streets=Array.from(net,k=>k.split(',').map(Number));if(streets.length<2)return;
- for(let j=0;j<14;j++){const walk=[streets[(j*7)%streets.length]];
+ for(let j=0;j<27;j++){const walk=[streets[(j*7)%streets.length]];
  for(let t=0;t<14;t++){const [x,y]=walk.at(-1),back=walk.at(-2);
  let options=[[x+1,y],[x-1,y],[x,y+1],[x,y-1]].filter(([a,b])=>net.has(Town.key(a,b)));
  if(options.length>1&&back)options=options.filter(([a,b])=>a!==back[0]||b!==back[1]);
  if(!options.length)break;walk.push(options[(t*13+j)%options.length])}if(walk.length>1)routes.push(walk.concat(walk.slice(1,-1).reverse()))}}
  function paint(t){
- requestAnimationFrame(paint);if(t-last<42||!w||document.hidden)return;const dt=Math.min(.1,(t-last)/1000);last=t;if(api.running())trafficTime+=dt*api.running();
+ requestAnimationFrame(paint);if(t-last<28||!w||document.hidden)return;const dt=Math.min(.1,(t-last)/1000);last=t;if(api.running())trafficTime+=dt*api.running();
  const c=api.city(),st=api.stats(),night=api.night(),v=TownArt.view(ctx,project,rotation,night);
  const bg=ctx.createLinearGradient(0,0,0,h);bg.addColorStop(0,night?'#253747':'#cbdacf');bg.addColorStop(1,night?'#48555c':'#e5dcc6');ctx.fillStyle=bg;ctx.fillRect(0,0,w,h);
  v.block(-1,-1,-.48,N+2,N+2,.22,'#799c99',night?'#526d76':'#9abdb7');for(let i=0;i<52;i++){
@@ -57,18 +57,26 @@ function townMap(canvas,api){
  const bad=api.mode()==='build'&&Town.valid(c,st.map,{...a,id,s});v.tile(a.x,a.y,n,n,.022,bad?'#bb806d':'#adcdb4','#376c66')}
  if(api.mode()==='build'&&id>=2&&!Town.valid(c,st.map,b))ghost=b}
  const list=[];
- for(const b of c.buildings){if(b.id<2)continue;const n=Town.sizes[b.s].n;list.push({d:depth(b.x+n/2,b.y+n/2),draw:()=>{v.structure(b,c.theme);if(!st.active.has(b)){const [x,y]=project(b.x+n*.5,b.y+n*.5,1);ctx.fillStyle='#af5845';ctx.fillRect(x-2,y-2,4,4)}}})}
+ for(const b of c.buildings){if(b.id<2)continue;const n=Town.sizes[b.s].n;list.push({d:depth(b.x+n/2,b.y+n/2),draw:()=>{v.structure(b,c.theme,trafficTime);if(!st.active.has(b)){const [x,y]=project(b.x+n*.5,b.y+n*.5,1);ctx.fillStyle='#af5845';ctx.fillRect(x-2,y-2,4,4)}}})}
  for(const b of c.buildings){if(b.id>=2||(b.x+2*b.y)%4!==0)continue;
  const x=b.x+.1,y=b.y+.14;list.push({d:depth(x,y),draw:()=>{v.block(x,y,.025,.031,.031,.43,'#586560');v.block(x-.037,y-.025,.45,.12,.09,.055,night?'#ffe5a3':'#d6c9a1')}})}
  for(let j=0;j<15;j++){const x=j%2?N+.46:-.47,y=1+j*1.02;if(y>17.6)continue;list.push({d:depth(x,y),draw:()=>v.tree(x,y,.72+(j%3)*.13)})}
  if(ghost){const n=Town.sizes[ghost.s].n;list.push({d:depth(ghost.x+n/2,ghost.y+n/2),draw:()=>{ctx.globalAlpha=.55;v.structure(ghost,c.theme);ctx.globalAlpha=1}})}
  traffic(st.net);
- routes.slice(0,Math.min(routes.length,Math.ceil(c.pop/7))).forEach((route,j)=>{const car=j%3===0,q=trafficTime*(car?.7:.32)+j*1.7,i=Math.floor(q)%route.length,f=q%1,[x,y]=route[i],[nx,ny]=route[(i+1)%route.length],dx=nx-x,dy=ny-y;
- const a=x+.5+dx*f-dy*(car?.13:.32),b=y+.5+dy*f+dx*(car?.13:.32),col=['#c57a58','#64798b','#aaa675','#e4be76'][j%4];
- list.push({d:depth(a,b),draw:()=>{if(car){v.block(a-.11,b-.10,.035,dx?.31:.21,dy?.31:.21,.095,col);v.block(a-.055,b-.06,.13,.13,.13,.05,'#9bb3b2')}else{v.block(a-.025,b-.025,.015,.055,.055,.125,col);v.ellipse(a,b,.17,1.6,1.9,'#d8ad84')}}})});
+ routes.slice(0,Math.min(routes.length,Math.ceil(c.pop/5))).forEach((route,j)=>{
+ const kind=['car','walk','cycle','walk','car','walk'][j%6],speed={car:.72,cycle:.46,walk:.26}[kind];
+ const q=trafficTime*speed+j*1.7,pose=StreetMotion.sample(route,q,kind==='walk'?.34:kind==='cycle'?.24:.14);
+ list.push({d:depth(pose.x,pose.y),draw:()=>StreetMotion.draw(ctx,project,pose,kind,j,trafficTime*(kind==='walk'?5.8:kind==='cycle'?4:9)+j,night)})
+ });
  list.sort((a,b)=>a.d-b.d).forEach(o=>o.draw());
  if(night){ctx.fillStyle='#182a4c45';ctx.fillRect(0,0,w,h);for(const b of c.buildings){if(b.id>1&&Town.items[b.id].group===1&&st.active.has(b)){const [x,y]=project(b.x+.68,b.y+.68,.24),r=12*base*zoom,gl=ctx.createRadialGradient(x,y,0,x,y,r);gl.addColorStop(0,'#ffde8f88');gl.addColorStop(1,'#ffd18000');ctx.fillStyle=gl;ctx.fillRect(x-r,y-r,r*2,r*2)}}}
  }
  requestAnimationFrame(paint);
- return {rotate(){rotation=(rotation+1)%4},zoom:setZoom,fit(){zoom=Math.min(1,w/(N*2*W*base+8),h/(N*2*H*base+40));panX=0;panY=0},project};
+ return {street(){
+ const s=api.stats(),roads=Array.from(s.net,k=>k.split(',').map(Number));
+ if(!roads.length)return;
+ const shops=Array.from(s.active).filter(b=>Town.items[b.id].group===1);
+ const street=roads.reduce((best,r)=>{const score=shops.reduce((n,b)=>n+1/(1+(b.x-r[0])**2+(b.y-r[1])**2),0);return score>best.score?{r,score}:best},{score:-1}).r;
+ zoom=3.6;panX=0;panY=0;const [px,py]=project(street[0]+.5,street[1]+.5);panX=w/2-px;panY=h*.57-py;
+ },rotate(){rotation=(rotation+1)%4},zoom:setZoom,fit(){zoom=Math.min(1,w/(N*2*W*base+8),h/(N*2*H*base+40));panX=0;panY=0},project};
 }

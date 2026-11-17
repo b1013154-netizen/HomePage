@@ -2,3 +2,4 @@
 #palette{grid-auto-rows:max-content}#palette button{min-height:max-content}.options label{margin-top:4px}
 #palette .zone-choice{min-height:44px;padding:7px}
 .new-town{margin-top:14px;font-size:13px}.new-town summary{cursor:pointer}
+.milestone{display:flex;align-items:center;gap:12px;padding:7px 12px;background:#e6eddf;border:1px solid #bdcbbd;font-size:12px}.milestone progress{width:95px;height:7px;accent-color:#467e69}.milestone button{margin-left:auto;white-space:nowrap}#palette button:disabled{filter:saturate(.5);opacity:.66;cursor:default}#rewardList p{border-bottom:1px solid #bccabd;padding:6px 0}@media(max-width:650px){.milestone progress{display:none}}
