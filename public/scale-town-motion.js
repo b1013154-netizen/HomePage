@@ -16,8 +16,9 @@ const StreetMotion=(()=>{
  }
  function draw(ctx,project,pose,kind,j,phase,night){
  const {x,y,angle}=pose,co=Math.cos(angle),si=Math.sin(angle);
- const pt=(a,b,z)=>project(x+a*co-b*si,y+a*si+b*co,z);
- const origin=pt(0,0,0),unit=Math.abs(project(x,y,1)[1]-origin[1]);
+ const age=Math.floor(j/2)%3,gender=j%2,size=kind==='walk'?[.7,1,.88][age]:1;
+ const pt=(a,b,z)=>project(x+size*(a*co-b*si),y+size*(a*si+b*co),z*size);
+ const origin=pt(0,0,0),unit=Math.abs(pt(0,0,1)[1]-origin[1]);
  function path(points){ctx.beginPath();points.forEach((v,i)=>i?ctx.lineTo(...pt(...v)):ctx.moveTo(...pt(...v)))}
  function fill(points,col){path(points);ctx.closePath();ctx.fillStyle=col;ctx.fill()}
  function line(points,width,col){path(points);ctx.lineWidth=Math.max(.45,width*unit);ctx.lineCap='round';ctx.lineJoin='round';ctx.strokeStyle=col;ctx.stroke()}
@@ -29,6 +30,15 @@ const StreetMotion=(()=>{
  }
  const near=pt(0,1,0)[1]>origin[1]?1:-1;
  oval(0,.02,.004,kind==='car'?.28:kind==='cycle'?.18:.078,kind==='car'?.09:.035,'#233d3844');
+ if(kind==='bus'){
+ const body='#4f8b81',edge=near*.18;
+ fill([[-.51,edge,.09],[.51,edge,.09],[.51,edge,.43],[-.51,edge,.43]],body);
+ const end=pt(1,0,0)[1]>origin[1]? .51:-.51;
+ fill([[end,-.18,.09],[end,.18,.09],[end,.18,.43],[end,-.18,.43]],'#588379');
+ fill([[-.51,-.18,.43],[.51,-.18,.43],[.51,.18,.43],[-.51,.18,.43]],'#d4d2bb');
+ for(let i=0;i<5;i++){const a=-.47+i*.19;fill([[a,edge,.25],[a+.15,edge,.25],[a+.15,edge,.38],[a,edge,.38]],night?'#e7d5a5':'#acc3c3')}
+ line([[-.49,edge,.19],[.49,edge,.19]],.032,'#f2d394');
+ for(const a of [-.32,.33])wheel(a,edge,.095,.08,false);return}
  if(kind==='car'){
  const paint=['#c76c50','#728daf','#e7bc72','#72a194','#c4c9c3'][j%5],front=pt(1,0,0)[1]>origin[1]?1:-1;
  const rings=[[.05,.275,.11],[.105,.318,.14],[.16,.28,.138],[.17,.23,.125],[.257,.125,.10]];
@@ -45,13 +55,19 @@ const StreetMotion=(()=>{
  if(night)fill([[.295,b,.018],[.64,b-.072,.011],[.64,b+.072,.011]],'#ffde9a38')}
  return}
  const coat=['#b46c51','#476781','#84925f','#c2945d','#a58395','#527e76'][j%6],skin=['#cb9776','#d6ad8c','#9f7359'][j%3];
- if(kind==='cycle'){
+ if(kind==='scooter'||kind==='scooterRack'){
+ for(const a of [-.16,.16])wheel(a,0,.055,.05,false);line([[-.16,0,.07],[.12,0,.07],[.16,0,.36]],.024,'#73968e');line([[.16,-.045,.36],[.16,.045,.36]],.024,'#455852');
+ if(kind==='scooter'){line([[-.075,0,.09],[-.045,0,.21],[0,0,.28],[.025,0,.40]],.053,coat);line([[.025,0,.38],[.08,near*.035,.32],[.16,near*.035,.36]],.026,skin);oval(.03,0,.455,.046,.056,skin);oval(.03,0,.49,.05,.028,'#677680')}
+ return}
+ if(kind==='cycle'||kind==='bikeRack'){
  const rear=[-.18,0,.12],hub=[.18,0,.12],crank=[0,0,.10],seat=[-.08,0,.31],bars=[.125,0,.33];
  wheel(...rear,.116,true);wheel(...hub,.116,true);line([rear,seat,crank,rear],.018,coat);line([seat,bars,crank],.017,coat);line([hub,bars,[.14,.05,.36]],.017,'#657678');
  line([[-.13,0,.323],[-.045,0,.323]],.028,'#423c37');
+ if(kind==='bikeRack')return;
  for(const side of [-near,near]){const a=phase+(side===near?0:Math.PI),pedal=[.057*Math.cos(a),side*.035,.12+.057*Math.sin(a)];line([[ -.065,side*.024,.32],[.08,side*.036,.25+.018*Math.sin(a)],pedal],.043,'#435057')}
  line([[-.065,0,.32],[.012,0,.46]],.084,coat);line([[.018,near*.024,.437],[.074,near*.038,.366],[.14,near*.04,.35]],.029,skin);
  oval(.041,0,.512,.049,.061,skin);oval(.036,0,.544,.05,.028,'#5a5450');return}
+ if(age===2)phase*=.77;
  const bob=.009*Math.cos(phase*2),hip=.17+bob,shoulder=.296+bob;
  for(const side of [-near,near]){
  const a=phase+(side===near?0:Math.PI),swing=Math.sin(a),lift=Math.max(0,Math.cos(a)),foot=[.088*swing,side*.021,.018+.045*lift],knee=[.04*swing+.035*lift,side*.021,.092+.019*lift];
@@ -67,7 +83,9 @@ const StreetMotion=(()=>{
  ctx.lineTo(cx+unit*.046,cy+unit*.141);ctx.quadraticCurveTo(cx,cy+unit*.153,cx-unit*.043,cy+unit*.136);ctx.closePath();ctx.fill();
  oval(.006,0,shoulder+.016,.021,.024,skin);
  for(const side of [-near,near]){const swing=Math.sin(phase+(side===near?0:Math.PI));line([[.008,side*.036,shoulder],[.003-.039*swing,side*.046,.237+bob]],.033,coat);line([[.003-.039*swing,side*.046,.237+bob],[.019-.075*swing,side*.045,.20+bob]],.024,skin)}
- oval(.011,0,.357+bob,.043,.053,skin);oval(.003,0,.383+bob,.045,.031,'#514941');oval(.046,0,.357+bob,.012,.014,skin);
+ oval(.011,0,.357+bob,.043,.053,skin);oval(.003,0,.383+bob,.045,.031,age===2?'#c5c0b4':'#514941');if(gender)oval(-.034,0,.355+bob,.023,.035,age===2?'#beb9ad':'#594e47');oval(.046,0,.357+bob,.012,.014,skin);
+ if(age===2)line([[.064,near*.045,.20+bob],[.09,near*.05,.012]],.013,'#806448');
+ if(age===0)oval(-.056,0,.24+bob,.042,.06,'#b75f48');
  if(j%3===1){line([[-.03,near*.024,shoulder],[.015,near*.03,hip+.01]],.011,'#706047');oval(-.022,near*.036,hip+.013,.037,.032,'#795945')}
  }
  return {sample,draw};

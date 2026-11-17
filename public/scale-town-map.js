@@ -1,6 +1,6 @@
 'use strict';
 function townMap(canvas,api){
- const ctx=canvas.getContext('2d'),N=Town.N,{W,H,Z}=TownArt;
+ const ctx=canvas.getContext('2d'),{W,H,Z}=TownArt;
  let rotation=0,zoom=1,panX=0,panY=0,w=0,h=0,base=1,hover=null,drag=null,last=0,trafficTime=0;
  function rotate(x,y){return [[x,y],[y,-x],[-x,-y],[-y,x]][rotation]}
  function project(x,y,z=0){const [a,b]=rotate(x-8.2,y-8.6),k=base*zoom;return [w*.5+panX+(a-b)*W*k,h*.51+panY+((a+b)*H-z*Z)*k]}
@@ -9,9 +9,9 @@ function townMap(canvas,api){
  new ResizeObserver(resize).observe(canvas);resize();
  function path(a,b){const cells=[{...a}];let {x,y}=a;while(x!==b.x){x+=Math.sign(b.x-x);cells.push({x,y})}while(y!==b.y){y+=Math.sign(b.y-y);cells.push({x,y})}return cells}
  function zoneCells(a,b){
- const cells=[];for(let x=Math.max(0,Math.min(a.x,b.x));x<=Math.min(N-1,Math.max(a.x,b.x));x++)
+ const N=Town.dimension(api.city()),cells=[];for(let x=Math.max(0,Math.min(a.x,b.x));x<=Math.min(N-1,Math.max(a.x,b.x));x++)
  for(let y=Math.max(0,Math.min(a.y,b.y));y<=Math.min(N-1,Math.max(a.y,b.y));y++)cells.push({x,y});return cells}
- function setZoom(k){zoom=Math.max(.53,Math.min(5,zoom*k))}
+ function setZoom(k){zoom=Math.max(.25,Math.min(5,zoom*k))}
  canvas.onwheel=e=>{e.preventDefault();setZoom(e.deltaY>0?.88:1.14)};
  canvas.oncontextmenu=e=>e.preventDefault();canvas.onpointerdown=e=>{
  if(drag)return;const start=cell(e);drag={id:e.pointerId,start,last:start,moving:api.mode()==='hand'||e.button===2||e.shiftKey,cx:e.clientX,cy:e.clientY};hover=start;canvas.setPointerCapture(e.pointerId)};
@@ -20,17 +20,10 @@ function townMap(canvas,api){
  if(api.mode()==='zone')api.zone(zoneCells(d.start,end));else if(api.mode()==='build'&&api.item()<2)api.placeRoad(path(d.start,end));else api.tap(end)};
  canvas.onpointercancel=canvas.onlostpointercapture=()=>{drag=null};canvas.onpointerleave=()=>{if(!drag)hover=null};
  function depth(x,y){const [a,b]=rotate(x,y);return a+b}
- let routes=[],oldNet=null;
- function traffic(net){if(oldNet===net)return;oldNet=net;routes=[];
- const streets=Array.from(net,k=>k.split(',').map(Number));if(streets.length<2)return;
- for(let j=0;j<27;j++){const walk=[streets[(j*7)%streets.length]];
- for(let t=0;t<14;t++){const [x,y]=walk.at(-1),back=walk.at(-2);
- let options=[[x+1,y],[x-1,y],[x,y+1],[x,y-1]].filter(([a,b])=>net.has(Town.key(a,b)));
- if(options.length>1&&back)options=options.filter(([a,b])=>a!==back[0]||b!==back[1]);
- if(!options.length)break;walk.push(options[(t*13+j)%options.length])}if(walk.length>1)routes.push(walk.concat(walk.slice(1,-1).reverse()))}}
+ let trafficState, trafficKey, trips;
  function paint(t){
  requestAnimationFrame(paint);if(t-last<28||!w||document.hidden)return;const dt=Math.min(.1,(t-last)/1000);last=t;if(api.running())trafficTime+=dt*api.running();
- const c=api.city(),st=api.stats(),night=api.night(),v=TownArt.view(ctx,project,rotation,night);
+ const c=api.city(),N=Town.dimension(c),st=api.stats(),night=api.night(),v=TownArt.view(ctx,project,rotation,night);
  const bg=ctx.createLinearGradient(0,0,0,h);bg.addColorStop(0,night?'#253747':'#cbdacf');bg.addColorStop(1,night?'#48555c':'#e5dcc6');ctx.fillStyle=bg;ctx.fillRect(0,0,w,h);
  v.block(-1,-1,-.48,N+2,N+2,.22,'#799c99',night?'#526d76':'#9abdb7');for(let i=0;i<52;i++){
  const a=(i*.73)%18,b=(i%3)*.21+.1,xx=i%2?a:N+b,yy=i%2?N+b:a;
@@ -52,7 +45,7 @@ function townMap(canvas,api){
  v.tile(-1,9,1,1,.013,'#758286');v.line([-.9,9.5,.03],[-.09,9.5,.03],'#f0dc9a',2);
  const preview=hover&&hover.x>=0&&hover.x<N&&hover.y>=0&&hover.y<N&&api.mode()!=='hand';
  let ghost=null;
- if(preview){const id=api.item(),s=id<2?1:api.scale(),b={...hover,id,s};const steps=api.mode()==='zone'&&drag?zoneCells(drag.start,hover):api.mode()==='build'&&id<2&&drag?path(drag.start,hover):[hover];
+ if(preview){const id=api.item(),s=id<2?1:api.scale(),b={...hover,id,s,...api.design()};const steps=api.mode()==='zone'&&drag?zoneCells(drag.start,hover):api.mode()==='build'&&id<2&&drag?path(drag.start,hover):[hover];
  for(const a of steps){const n=api.mode()==='build'?Town.sizes[s].n:1;
  const bad=api.mode()==='build'&&Town.valid(c,st.map,{...a,id,s});v.tile(a.x,a.y,n,n,.022,bad?'#bb806d':'#adcdb4','#376c66')}
  if(api.mode()==='build'&&id>=2&&!Town.valid(c,st.map,b))ghost=b}
@@ -62,12 +55,8 @@ function townMap(canvas,api){
  const x=b.x+.1,y=b.y+.14;list.push({d:depth(x,y),draw:()=>{v.block(x,y,.025,.031,.031,.43,'#586560');v.block(x-.037,y-.025,.45,.12,.09,.055,night?'#ffe5a3':'#d6c9a1')}})}
  for(let j=0;j<15;j++){const x=j%2?N+.46:-.47,y=1+j*1.02;if(y>17.6)continue;list.push({d:depth(x,y),draw:()=>v.tree(x,y,.72+(j%3)*.13)})}
  if(ghost){const n=Town.sizes[ghost.s].n;list.push({d:depth(ghost.x+n/2,ghost.y+n/2),draw:()=>{ctx.globalAlpha=.55;v.structure(ghost,c.theme);ctx.globalAlpha=1}})}
- traffic(st.net);
- routes.slice(0,Math.min(routes.length,Math.ceil(c.pop/5))).forEach((route,j)=>{
- const kind=['car','walk','cycle','walk','car','walk'][j%6],speed={car:.72,cycle:.46,walk:.26}[kind];
- const q=trafficTime*speed+j*1.7,pose=StreetMotion.sample(route,q,kind==='walk'?.34:kind==='cycle'?.24:.14);
- list.push({d:depth(pose.x,pose.y),draw:()=>StreetMotion.draw(ctx,project,pose,kind,j,trafficTime*(kind==='walk'?5.8:kind==='cycle'?4:9)+j,night)})
- });
+ if(st!==trafficState){trafficState=st;const k=c.buildings.map(b=>[b.x,b.y,b.id,b.s,b.dir||0].join(',')).join(';');if(k!==trafficKey){trips=TownTrips.plan(c,st);trafficKey=k}}
+ for(const actor of TownTrips.actors(trips,trafficTime,c.pop)){const {pose,kind,j,phase}=actor;list.push({d:depth(pose.x,pose.y),draw:()=>StreetMotion.draw(ctx,project,pose,kind,j,phase,night)})}
  list.sort((a,b)=>a.d-b.d).forEach(o=>o.draw());
  if(night){ctx.fillStyle='#182a4c45';ctx.fillRect(0,0,w,h);for(const b of c.buildings){if(b.id>1&&Town.items[b.id].group===1&&st.active.has(b)){const [x,y]=project(b.x+.68,b.y+.68,.24),r=12*base*zoom,gl=ctx.createRadialGradient(x,y,0,x,y,r);gl.addColorStop(0,'#ffde8f88');gl.addColorStop(1,'#ffd18000');ctx.fillStyle=gl;ctx.fillRect(x-r,y-r,r*2,r*2)}}}
  }
@@ -78,5 +67,5 @@ function townMap(canvas,api){
  const shops=Array.from(s.active).filter(b=>Town.items[b.id].group===1);
  const street=roads.reduce((best,r)=>{const score=shops.reduce((n,b)=>n+1/(1+(b.x-r[0])**2+(b.y-r[1])**2),0);return score>best.score?{r,score}:best},{score:-1}).r;
  zoom=3.6;panX=0;panY=0;const [px,py]=project(street[0]+.5,street[1]+.5);panX=w/2-px;panY=h*.57-py;
- },rotate(){rotation=(rotation+1)%4},zoom:setZoom,fit(){zoom=Math.min(1,w/(N*2*W*base+8),h/(N*2*H*base+40));panX=0;panY=0},project};
+ },rotate(){rotation=(rotation+1)%4},zoom:setZoom,fit(){const N=Town.dimension(api.city());zoom=Math.min(1,w/(N*2*W*base+8),h/(N*2*H*base+40));panX=0;panY=0;const [px,py]=project(N/2,N/2);panX=w/2-px;panY=h*.51-py},project};
 }

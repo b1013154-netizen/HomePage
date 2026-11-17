@@ -23,6 +23,18 @@ const Town=(()=>{
  ['空中庭園レジデンス','skyGarden','#87aa9d',5000,480,28,9,1,2],
  ['商住複合センター','cityCentre','#9ba6b6',6800,360,260,8,1,1],
  ['一万人記念広場','civicPlaza','#c0a166',1000,0,12,30,5,4]);
+ rows.push(
+ ['時間貸し駐車場','parking','#738682',180,0,1,1,1,3],
+ ['アイスクリーム店','ice','#cf99ad',115,0,5,6,0,1],['時計工房','watch','#aa875e',165,0,7,7,0,1],
+ ['写真館','photo','#718497',170,0,7,6,0,1],['茶舗','tea','#87a47b',120,0,5,7,0,1],
+ ['天文台','observatory','#919eae',390,0,12,13,3,3],['消防署','fire','#b97768',290,0,14,3,4,3],
+ ['温室植物園','glasshouse','#89ae98',240,0,5,12,2,4],['野外音楽堂','stage','#aa8870',260,0,9,13,2,4],
+ ['中庭付きコーポ','court','#cea780',260,36,0,3,0,2],['山小屋住宅','lodge','#ab886b',110,12,0,2,0,2],
+ ['灯台公園','beacon','#c69c83',250,0,4,11,2,4]);
+ const policies=[['姉妹都市交流条約',9,24],['街路樹保全条例',6,12],['夜間静穏条例',4,6],['屋外広告の自由化',-5,-18]];
+ const dimension=c=>c.areaSize||N;
+ const landPrice=c=>dimension(c)>=36?0:1500*2**((dimension(c)-N)/6);
+ const levy=c=>c.levy??Math.round((c.tax??9)*12)/100;
  const milestones=[
  {pop:50,ids:[34,11]}, {pop:100,ids:[35,12]}, {pop:180,ids:[36,13]},
  {pop:300,ids:[37,15]}, {pop:500,ids:[38]}, {pop:1000,ids:[39,40]}, {pop:2500,ids:[41,42]},
@@ -45,11 +57,13 @@ const Town=(()=>{
  for(const b of c.buildings){const v=items[b.id],f=sizes[b.s].fac;if(v.group===0){upkeep+=.18;continue}upkeep+=f*(v.group===3?3:1);if(!access(b,net)){inactive++;continue}active.add(b);
  homes+=Math.round(v.homes*f*(c.theme===3&&v.homes>=18?1.15:1));jobs+=Math.round(v.jobs*f);beauty+=v.appeal*Math.sqrt(f);service+=v.service*f;
  if(v.group===4)green+=v.appeal*f;if(v.group===1){shops++;kinds.add(b.id);gross+=v.jobs*f*(c.theme===0?1.15:c.theme===2&&['cafe','cinema','lantern','cup','cap'].includes(v.form)?1.25:1)}}
- const happy=Math.max(15,Math.min(99,Math.round(48+Math.min(17,beauty*.20)+Math.min(13,service*1.5)+Math.min(10,green*(c.theme===1?.63:.5))+Math.min(10,kinds.size*1.3)-(c.tax-9)*2.4)));
+ const happy=Math.max(15,Math.min(99,Math.round(48+Math.min(17,beauty*.20)+Math.min(13,service*1.5)+Math.min(10,green*(c.theme===1?.63:.5))+Math.min(10,kinds.size*1.3)-(levy(c)-1.08)*20)));
  const target=Math.floor(Math.min(populationLimit,homes,(jobs*2.1+6)*(happy/85)));
- const balance=Math.round(c.pop*c.tax*.12+gross*Math.min(1,c.pop/Math.max(12,jobs))*.85-upkeep);
- return {map,net,homes,jobs,happy,target,balance,inactive,shops,active}}
- function valid(c,map,b,ignore=null){const n=sizes[b.s].n;if(b.x<0||b.y<0||b.x+n>N||b.y+n>N)return '敷地の外です';for(let x=b.x;x<b.x+n;x++)for(let y=b.y;y<b.y+n;y++){const o=map.get(key(x,y));if(o&&o!==ignore)return 'ほかの建物・道路と重なっています'}return ''}
+ const agreements=policies.filter((_,i)=>c.policies?.includes(i));
+ const popularity=Math.max(0,Math.min(100,Math.round(28+Math.min(20,kinds.size*2)+Math.min(15,green*.28)+Math.min(12,service*.42)-Math.min(15,inactive)+agreements.reduce((sum,p)=>sum+p[1],0))));
+ const balance=Math.round(c.pop*levy(c)-agreements.reduce((sum,p)=>sum+p[2],0)+gross*Math.min(1,c.pop/Math.max(12,jobs))*.85-upkeep);
+ return {map,net,homes,jobs,popularity,happy,target,balance,inactive,shops,active}}
+ function valid(c,map,b,ignore=null){const n=sizes[b.s].n;if(b.x<0||b.y<0||b.x+n>dimension(c)||b.y+n>dimension(c))return '敷地の外です';for(let x=b.x;x<b.x+n;x++)for(let y=b.y;y<b.y+n;y++){const o=map.get(key(x,y));if(o&&o!==ignore)return 'ほかの建物・道路と重なっています'}return ''}
  function develop(c,s){
  const sorted=Object.entries(c.zones||{});if(!sorted.length)return;
  for(let i=0;i<sorted.length;i++){
@@ -67,5 +81,5 @@ const Town=(()=>{
  if(existing)c.buildings[c.buildings.indexOf(existing)]=b;else c.buildings.push(b);return;
  }}
  function day(c){let s=stats(c);develop(c,s);s=stats(c);c.cash+=s.balance;c.pop+=Math.sign(s.target-c.pop)*Math.min(Math.abs(s.target-c.pop),Math.ceil(Math.abs(s.target-c.pop)*.19));c.peak=Math.max(c.peak||0,c.pop);c.day++;c.history.push(c.pop);if(c.history.length>24)c.history.shift()}
- return {populationLimit,milestones,required,unlocked,N,groups,items,themes,sizes,start,index,key,stats,price,valid,day};
+ return {levy,policies,dimension,landPrice,populationLimit,milestones,required,unlocked,N,groups,items,themes,sizes,start,index,key,stats,price,valid,day};
 })();

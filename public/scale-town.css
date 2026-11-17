@@ -3,3 +3,5 @@
 #palette .zone-choice{min-height:44px;padding:7px}
 .new-town{margin-top:14px;font-size:13px}.new-town summary{cursor:pointer}
 .milestone{display:flex;align-items:center;gap:12px;padding:7px 12px;background:#e6eddf;border:1px solid #bdcbbd;font-size:12px}.milestone progress{width:95px;height:7px;accent-color:#467e69}.milestone button{margin-left:auto;white-space:nowrap}#palette button:disabled{filter:saturate(.5);opacity:.66;cursor:default}#rewardList p{border-bottom:1px solid #bccabd;padding:6px 0}@media(max-width:650px){.milestone progress{display:none}}
+
+.council{display:flex;align-items:center;flex-wrap:wrap;gap:.7rem;padding:.6rem 1rem;background:#203c3c;color:#f8edce;border-radius:.6rem;margin:.55rem 0}.council span{margin-left:auto}.council button{background:#ffe3aa;color:#283c35}.options label{display:inline-flex;gap:.4rem;margin:.3rem}.options #remodel{display:block;margin:.4rem 0}#agreements{border:1px solid #a8b6a2;margin:.8rem 0}#agreements label{display:block;margin:.35rem}
