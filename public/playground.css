@@ -11,3 +11,5 @@
 .world-image.doodle-world{background:linear-gradient(90deg,#183d36be,transparent 78%),url('/assets/doodle-field.webp') center/cover,#718d72;color:#fff8db}
 .world-image.museum-world{background:linear-gradient(90deg,#152520bb,transparent 90%),url('/assets/future-museum/cover.webp') 65% center/cover,#2c3933;color:#fff3d3}
 .world-image.town-world{background:linear-gradient(90deg,#193e3ddd,transparent 90%),url('/assets/scale-town.webp') center/cover,#546b5e;color:#fff7df}
+
+.visit-counter{display:grid;gap:.3rem;margin:1.6rem 0 0;padding-left:1rem;border-left:3px solid #d78459}.visit-counter>span{font-size:.8rem;color:#52645b}.visit-counter strong{font-size:1.8rem;font-variant-numeric:tabular-nums;color:#233e34}.visit-counter small{font-size:.65rem;color:#6d756c}
