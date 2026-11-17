@@ -21,7 +21,7 @@
  const peak=city.peak||city.pop,next=Town.milestones.find(m=>m.pop>peak);
  const names=m=>m.ids.map(id=>Town.items[id].name).join('・');
  $('milestoneText').textContent=next?'最高人口 '+peak+' 人 ／ '+next.pop+' 人で '+names(next):'最高人口 '+peak+' 人 ／ すべての人口報酬を達成';
- $('milestoneProgress').max=next?.pop||500;$('milestoneProgress').value=peak;
+ $('milestoneProgress').max=next?.pop||Town.populationLimit;$('milestoneProgress').value=peak;
  const list=$('rewardList');list.replaceChildren();
  for(const m of Town.milestones){const row=document.createElement('p');row.textContent=(peak>=m.pop?'✓ 達成':'未達成')+'　'+m.pop+' 人　'+names(m);list.append(row)}
  }
@@ -56,7 +56,7 @@
  const cost=Math.max(0,Town.price(b.id,scale)-Town.price(b.id,b.s));if(cost&&!spend(cost))return;
  Object.assign(b,spots[0]);b.paid=Math.min(Town.price(b.id,scale),paid+(city.free?0:cost));changed(v.name+'を「'+Town.sizes[scale].name+'」に変更しました。')}
  }
- function details(){const s=status,el=$('details');el.replaceChildren();for(const line of ['人口 '+fmt(city.pop)+' 人 ／ 入居枠 '+fmt(s.homes)+' 人','営業中のお店 '+s.shops+' 軒 ／ 雇用 '+fmt(s.jobs)+' 人','道路未接続の施設 '+s.inactive+' 件','日次収支 '+(s.balance>=0?'+':'')+s.balance+' G ／ 税率 '+city.tax+'%','街の方針　'+Town.themes[city.theme][0]]){const p=document.createElement('p');p.textContent=line;el.append(p)}
+ function details(){const s=status,el=$('details');el.replaceChildren();for(const line of ['人口 '+fmt(city.pop)+' 人 ／ 入居枠 '+fmt(s.homes)+' 人','営業中のお店 '+s.shops+' 軒 ／ 雇用 '+fmt(s.jobs)+' 人','道路未接続の施設 '+s.inactive+' 件','日次収支 '+(s.balance>=0?'+':'')+s.balance+' G ／ 税率 '+city.tax+'%','現在の条件で見込める人口 '+fmt(s.target)+' 人 ／ 都市の人口上限 '+fmt(Town.populationLimit)+' 人','街の方針　'+Town.themes[city.theme][0]]){const p=document.createElement('p');p.textContent=line;el.append(p)}
  const cv=$('trend'),g=cv.getContext('2d'),hist=city.history,max=Math.max(...hist,10);g.fillStyle='#eaf0df';g.fillRect(0,0,460,125);g.beginPath();hist.forEach((v,i)=>{const x=12+i*434/Math.max(1,hist.length-1),y=110-v*90/max;if(i)g.lineTo(x,y);else g.moveTo(x,y)});g.strokeStyle='#347969';g.lineWidth=3;g.stroke();g.fillStyle='#347969';g.fillText(fmt(hist.at(-1))+' 人',12,14)}
  mapView=townMap($('map'),{mode:()=>mode,item:()=>id,scale:()=>scale,city:()=>city,stats:()=>status,night:()=>night,running:()=>paused?0:speed,placeRoad,tap,zone(cells){
  let count=0;for(const {x,y} of cells){const k=Town.key(x,y);if(zoneType==='clear'){if(k in city.zones){delete city.zones[k];count++}}else if(!status.map.has(k)&&city.zones[k]!==zoneType){city.zones[k]=zoneType;count++}}

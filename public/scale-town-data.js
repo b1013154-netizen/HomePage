@@ -1,5 +1,6 @@
 'use strict';
 const Town=(()=>{
+ const populationLimit=10000;
  const N=18,groups=['道路','お店','住宅','公共','緑地'];
  // name, architectural form, facade color, construction cost, homes, jobs, appeal, service
  const rows=[
@@ -14,10 +15,18 @@ const Town=(()=>{
  ['花時計広場','clockgarden','#b98699',140,0,2,12,2,4],
  ['メリーゴーラウンド','carousel','#b96e65',360,0,16,16,1,4],
  ['港の時計塔','clocktower','#b39178',480,0,8,18,4,3],
- ['大観覧車','wheel','#859bb2',860,0,36,28,3,4]);
+ ['大観覧車','wheel','#859bb2',860,0,36,28,3,4],
+ ['駅前住宅タワー','resTower','#98afba',1400,160,8,2,0,2],
+ ['駅ビル商店街','stationMall','#ae9885',1600,18,110,8,0,1],
+ ['テラス集合住宅','terraces','#aeac91',2700,280,16,4,0,2],
+ ['商業オフィスタワー','office','#829eae',3200,0,240,5,0,1],
+ ['空中庭園レジデンス','skyGarden','#87aa9d',5000,480,28,9,1,2],
+ ['商住複合センター','cityCentre','#9ba6b6',6800,360,260,8,1,1],
+ ['一万人記念広場','civicPlaza','#c0a166',1000,0,12,30,5,4]);
  const milestones=[
  {pop:50,ids:[34,11]}, {pop:100,ids:[35,12]}, {pop:180,ids:[36,13]},
- {pop:300,ids:[37,15]}, {pop:500,ids:[38]}];
+ {pop:300,ids:[37,15]}, {pop:500,ids:[38]}, {pop:1000,ids:[39,40]}, {pop:2500,ids:[41,42]},
+ {pop:5000,ids:[43]}, {pop:7500,ids:[44]}, {pop:populationLimit,ids:[45]}];
  const required=id=>milestones.find(m=>m.ids.includes(id))?.pop||0;
  const unlocked=(c,id)=>Math.max(c.peak||0,c.pop)>=required(id);
  const items=rows.map(([name,form,color,cost,homes,jobs,appeal,service,group],id)=>({id,name,form,color,cost,homes,jobs,appeal,service,group}));
@@ -37,7 +46,7 @@ const Town=(()=>{
  homes+=Math.round(v.homes*f*(c.theme===3&&v.homes>=18?1.15:1));jobs+=Math.round(v.jobs*f);beauty+=v.appeal*Math.sqrt(f);service+=v.service*f;
  if(v.group===4)green+=v.appeal*f;if(v.group===1){shops++;kinds.add(b.id);gross+=v.jobs*f*(c.theme===0?1.15:c.theme===2&&['cafe','cinema','lantern','cup','cap'].includes(v.form)?1.25:1)}}
  const happy=Math.max(15,Math.min(99,Math.round(48+Math.min(17,beauty*.20)+Math.min(13,service*1.5)+Math.min(10,green*(c.theme===1?.63:.5))+Math.min(10,kinds.size*1.3)-(c.tax-9)*2.4)));
- const target=Math.floor(Math.min(homes,(jobs*2.1+6)*(happy/85)));
+ const target=Math.floor(Math.min(populationLimit,homes,(jobs*2.1+6)*(happy/85)));
  const balance=Math.round(c.pop*c.tax*.12+gross*Math.min(1,c.pop/Math.max(12,jobs))*.85-upkeep);
  return {map,net,homes,jobs,happy,target,balance,inactive,shops,active}}
  function valid(c,map,b,ignore=null){const n=sizes[b.s].n;if(b.x<0||b.y<0||b.x+n>N||b.y+n>N)return '敷地の外です';for(let x=b.x;x<b.x+n;x++)for(let y=b.y;y<b.y+n;y++){const o=map.get(key(x,y));if(o&&o!==ignore)return 'ほかの建物・道路と重なっています'}return ''}
@@ -45,14 +54,18 @@ const Town=(()=>{
  const sorted=Object.entries(c.zones||{});if(!sorted.length)return;
  for(let i=0;i<sorted.length;i++){
  const [k,type]=sorted[(i+c.day)%sorted.length],[x,y]=k.split(',').map(Number);
- if(s.map.has(k))continue;
- const housing=type==='home';
+ const existing=s.map.get(k),housing=type==='home';
+ if(existing&&(!existing.zoned||existing.s!==1||items[existing.id].group!==(housing?2:1)))continue;
  if(housing?s.homes>c.pop*1.5+20:s.jobs>c.pop*.85+15)continue;
  const choices=housing?[19,20,21,23]:[2,3,4,5,6,7,8,9,10,11,16,17,18];
- const allowed=choices.filter(id=>unlocked(c,id));const b={x,y,s:1,id:allowed[(x*3+y+c.day+c.theme)%allowed.length],paid:0};
+ const tiers=(housing?[39,41,43]:[40,42,44]).filter(id=>unlocked(c,id));
+ const metric=housing?'homes':'jobs';
+ const id=tiers.length?tiers.at(-1):choices[(x*3+y+c.day+c.theme)%choices.length];
+ if(!unlocked(c,id)||(existing&&items[existing.id][metric]>=items[id][metric]))continue;
+ const b={x,y,s:1,id,paid:0,zoned:true};
  if(!access(b,s.net))continue;
- c.buildings.push(b);return;
+ if(existing)c.buildings[c.buildings.indexOf(existing)]=b;else c.buildings.push(b);return;
  }}
  function day(c){let s=stats(c);develop(c,s);s=stats(c);c.cash+=s.balance;c.pop+=Math.sign(s.target-c.pop)*Math.min(Math.abs(s.target-c.pop),Math.ceil(Math.abs(s.target-c.pop)*.19));c.peak=Math.max(c.peak||0,c.pop);c.day++;c.history.push(c.pop);if(c.history.length>24)c.history.shift()}
- return {milestones,required,unlocked,N,groups,items,themes,sizes,start,index,key,stats,price,valid,day};
+ return {populationLimit,milestones,required,unlocked,N,groups,items,themes,sizes,start,index,key,stats,price,valid,day};
 })();
