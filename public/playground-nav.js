@@ -14,6 +14,13 @@
     { url: '/hoshizora', title: 'HOSHIZORA', sub: '世界の88星座をめぐる図鑑', icon: '✧' },
     { url: '/planetarium', title: '全天プラネタリウム', sub: 'HOSHIZORA · 118,216個の星を探検', icon: '◌' }
   ];
+  if (path !== '/' && pages.some(p => p.url === path)) {
+    try {
+      const previous = JSON.parse(localStorage.getItem('playground.recent.v1') || '[]');
+      const rows = Array.isArray(previous) ? previous.filter(p => p.url !== path && pages.some(page => page.url === p.url)) : [];
+      localStorage.setItem('playground.recent.v1', JSON.stringify([{url:path, at:Date.now()}, ...rows].slice(0, 6)));
+    } catch {}
+  }
   const button = document.createElement('button');
   button.className = 'pg-menu-button';
   button.type = 'button';

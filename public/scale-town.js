@@ -5,6 +5,7 @@
  try{const s=JSON.parse(localStorage.getItem(key));if(s?.version===1&&Array.isArray(s.buildings)&&Array.isArray(s.history))city=s}catch{}
  city.peak=Math.max(city.peak||0,city.pop,...city.history);
  const design=()=>({dir:$('dir').selectedIndex,style:$('style').selectedIndex});
+ let selectedBuilding=null,goalItem=19;
  let zoneType='home';city.zones??={};let status=Town.stats(city),mapView,simulationClock=0;
  function say(text){$('message').textContent=text}
  function persist(){try{localStorage.setItem(key,JSON.stringify(city))}catch{say('このブラウザでは保存できません。')}}
@@ -27,9 +28,30 @@
  for(const m of Town.milestones){const row=document.createElement('p');row.textContent=(peak>=m.pop?'✓ 達成':'未達成')+'　'+m.pop+' 人　'+names(m);list.append(row)}
  }
  $('rewardsOpen').onclick=()=>{rewardStatus();$('rewards').showModal()};
+ function nextGoal(){
+ const connected=Array.from(status.active),count=id=>connected.filter(b=>b.id===id).length;
+ let text,action;
+ if(status.inactive){text='道路につながっていない施設が '+status.inactive+' 件あります。入口から道路を延ばして営業を始めよう。';goalItem=0;action='道路を引く'}
+ else if(status.homes<city.pop*1.2+10){text='住宅を増やして、新しい住民を迎えよう。入居枠 '+fmt(status.homes)+' 人／現在 '+fmt(city.pop)+' 人。';goalItem=19;action='住宅を建てる'}
+ else if(status.jobs*2.1<city.pop+25){text='お店を増やして雇用をつくろう。現在の雇用 '+fmt(status.jobs)+' 人。';goalItem=2;action='お店を建てる'}
+ else if(!count(46)){text='駐車場を道路沿いに建て、車を降りて買い物する住民を観察しよう。';goalItem=46;action='駐車場を建てる'}
+ else if(count(24)<2){text='道路沿いのバス停を2か所に増やし、街を巡るバスを走らせよう。';goalItem=24;action='バス停を置く'}
+ else if(status.popularity<75){text='緑地を増やして、人気度75を目指そう。条例や姉妹都市交流条約でも人気度が変わります。';goalItem=30;action='公園をつくる'}
+ else {const next=Town.milestones.find(m=>m.pop>(city.peak||city.pop));text=next?'次は人口 '+fmt(next.pop)+' 人を目指そう。住宅地と商業地を育てると、新しい施設が解放されます。':'すべての人口報酬を達成！巨大建築や外観を組み合わせ、自分だけの街並みを仕上げよう。';goalItem=19;action='街を育てる'}
+ $('goalText').textContent=text;$('goalAction').textContent=action+' →';
+ }
+ $('goalAction').onclick=()=>{id=goalItem;group=Town.items[id].group;palette();setMode('build');$('map').scrollIntoView({block:'center',behavior:'smooth'})};
+ function editBuilding(b){selectedBuilding=b;$('buildingEditor').hidden=false;$('residentInfo').hidden=true;editorDetails()}
+ function editorDetails(){if(!selectedBuilding||!city.buildings.includes(selectedBuilding)){$('buildingEditor').hidden=true;selectedBuilding=null;return}
+ const b=selectedBuilding,v=Town.items[b.id];$('editingName').textContent=v.name;$('editingSpec').textContent='正面 '+['南','西','北','東'][b.dir||0]+' ／ 外観 '+['標準','木造回廊','モダンテラス'][b.style||0]+' ／ '+(status.active.has(b)?'道路接続済み':'道路未接続')+' ／ 撤去時の返金 '+fmt(Math.floor((b.paid??Town.price(b.id,b.s))/2))+' G';}
+ $('closeEditor').onclick=()=>{selectedBuilding=null;$('buildingEditor').hidden=true};
+ $('turnBuilding').onclick=()=>{if(!selectedBuilding)return;selectedBuilding.dir=((selectedBuilding.dir||0)+1)%4;changed('建物を90度回転しました。')};
+ $('changeExterior').onclick=()=>{if(!selectedBuilding)return;selectedBuilding.style=((selectedBuilding.style||0)+1)%3;changed('建物の外観を変更しました。')};
+ $('focusBuilding').onclick=()=>{if(selectedBuilding)mapView.focus(selectedBuilding)};
+ $('deleteBuilding').onclick=()=>{if(!selectedBuilding)return;const b=selectedBuilding;city.cash+=Math.floor((b.paid??Town.price(b.id,b.s))/2);city.buildings.splice(city.buildings.indexOf(b),1);delete city.zones[Town.key(b.x,b.y)];selectedBuilding=null;changed('選択した建物を撤去しました。')};
  function hud(){rewardStatus();status=Town.stats(city);
  const n=Town.dimension(city),cost=Town.landPrice(city);$('landSize').textContent=n+' × '+n+' 区画';$('expand').disabled=!cost||city.cash<cost;$('expand').textContent=cost?(n+6)+' × '+(n+6)+' に拡張・'+fmt(cost)+' G':'全エリア購入済み';
- $('popularity').textContent='街の人気度　'+status.popularity+' / 100';$('cityName').textContent=city.name;$('day').textContent='第 '+city.day+' 日';$('pop').textContent=fmt(city.pop)+' 人';$('cash').textContent=fmt(city.cash)+' G';$('income').textContent=(status.balance>=0?'+':'')+fmt(status.balance)+' G';$('happy').textContent=status.happy+' %';controls();if($('stats').open)details()}
+ $('popularity').textContent='街の人気度　'+status.popularity+' / 100';$('cityName').textContent=city.name;$('day').textContent='第 '+city.day+' 日';$('pop').textContent=fmt(city.pop)+' 人';$('cash').textContent=fmt(city.cash)+' G';$('income').textContent=(status.balance>=0?'+':'')+fmt(status.balance)+' G';$('happy').textContent=status.happy+' %';controls();nextGoal();editorDetails();if($('stats').open)details()}
  function icon(button,item){const cv=document.createElement('canvas');cv.width=120;cv.height=78;button.append(cv);const g=cv.getContext('2d'),p=(x,y,z=0)=>[60+(x-y)*32,58+(x+y-1)*15-z*25];
  const art=TownArt.view(g,p,0,false);art.tile(0,0,1,1,0,'#d6dbc6');if(item.id<2){art.tile(.05,.05,.96,.96,.01,item.id===0?'#707d82':'#ae8672');art.line([.2,.5,.02],[.8,.5,.02],'#efd5ac',2)}else art.structure({x:0,y:0,s:1,id:item.id,...design()},city.theme)}
  function palette(){const list=$('palette');list.replaceChildren();if(group===5){
@@ -46,6 +68,7 @@
  if(!fresh.length)return say('すでに道路が通っています。');const cost=Town.price(id,1);if(!spend(fresh.length*cost))return;
  city.buildings.push(...fresh.map(o=>({...o,id,s:1,paid:city.free?0:cost})));changed(fresh.length+' 区画の道路を開通しました。')}
  function tap(pos){const {x,y}=pos,b=status.map.get(Town.key(x,y));
+ if(b&&b.id>=2&&(mode==='build'||mode==='inspect'||mode==='hand')){editBuilding(b);return}
  if(mode==='build'){
  if(!Town.unlocked(city,id))return say('人口条件を達成すると建設できます。');const obj={id,s:scale,x,y,...design()},err=Town.valid(city,status.map,obj);if(err)return say(err);const cost=Town.price(id,scale);if(!spend(cost))return;
  obj.paid=city.free?0:cost;city.buildings.push(obj);changed(Town.items[id].name+'が完成しました。');if(!status.active.has(obj))say('完成しました。町外につながる道路を建物の辺に接続してください。');return}
@@ -62,7 +85,10 @@
  }
  function details(){const s=status,el=$('details');el.replaceChildren();for(const line of ['人口 '+fmt(city.pop)+' 人 ／ 入居枠 '+fmt(s.homes)+' 人','営業中のお店 '+s.shops+' 軒 ／ 雇用 '+fmt(s.jobs)+' 人','道路未接続の施設 '+s.inactive+' 件','交通　バス停 '+Array.from(s.active).filter(b=>b.id===24).length+' か所 ／ 駐車場 '+Array.from(s.active).filter(b=>b.id===46).length+' か所（道路接続済み）','街の人気度 '+s.popularity+' / 100　店の種類・緑地・公共サービス・条例で変動','住民の姿　子ども・大人・高齢者、それぞれに男女の姿があります。','日次収支 '+(s.balance>=0?'+':'')+s.balance+' G ／ 住民税 '+Town.levy(city)+' G・人／日','現在の条件で見込める人口 '+fmt(s.target)+' 人 ／ 都市の人口上限 '+fmt(Town.populationLimit)+' 人','街の方針　'+Town.themes[city.theme][0]]){const p=document.createElement('p');p.textContent=line;el.append(p)}
  const cv=$('trend'),g=cv.getContext('2d'),hist=city.history,max=Math.max(...hist,10);g.fillStyle='#eaf0df';g.fillRect(0,0,460,125);g.beginPath();hist.forEach((v,i)=>{const x=12+i*434/Math.max(1,hist.length-1),y=110-v*90/max;if(i)g.lineTo(x,y);else g.moveTo(x,y)});g.strokeStyle='#347969';g.lineWidth=3;g.stroke();g.fillStyle='#347969';g.fillText(fmt(hist.at(-1))+' 人',12,14)}
- mapView=townMap($('map'),{design,mode:()=>mode,item:()=>id,scale:()=>scale,city:()=>city,stats:()=>status,night:()=>night,running:()=>paused?0:speed,placeRoad,tap,zone(cells){
+ mapView=townMap($('map'),{selected:()=>selectedBuilding,resident(actor){selectedBuilding=null;$('buildingEditor').hidden=true;$('residentInfo').hidden=false;
+ const age=['子ども','大人','高齢者'][Math.floor(actor.j/2)%3],gender=actor.j%2?'女性':'男性';
+ $('residentInfo').textContent='住民 '+(actor.j+1)+' ／ '+age+'・'+gender+' ／ '+(actor.activity||'移動中')+' ／ 行き先 '+(actor.destination||'バス停')+' ／ 自宅 '+(actor.home||'街の住宅');
+ },design,mode:()=>mode,item:()=>id,scale:()=>scale,city:()=>city,stats:()=>status,night:()=>night,running:()=>paused?0:speed,placeRoad,tap,zone(cells){
  let count=0;for(const {x,y} of cells){const k=Town.key(x,y);if(zoneType==='clear'){if(k in city.zones){delete city.zones[k];count++}}else if(!status.map.has(k)&&city.zones[k]!==zoneType){city.zones[k]=zoneType;count++}}
  changed(count+' 区画の指定を更新しました。')
  }});
@@ -83,5 +109,5 @@
  mapView.fit();$('setup').close();palette();changed('新しい街が誕生しました。入口の道路から通りを延ばしてください。')
  };
  setInterval(()=>{if(paused||document.hidden||$('setup').open)return;simulationClock+=speed;if(simulationClock<7)return;simulationClock-=7;const prev=city.peak||city.pop;Town.day(city);const reached=Town.milestones.filter(m=>prev<m.pop&&m.pop<=city.peak);if(reached.length){palette();say('人口報酬を獲得！ '+reached.flatMap(m=>m.ids.map(id=>Town.items[id].name)).join('・')+' が建設できます。')}hud();persist()},1000);
- palette();hud();say('道路沿いの空き区画に最初のお店を置こう。街の名前と方針は「街の設定」から。');
+ palette();hud();say('建物を押すと回転・外観・撤去を直接編集できます。「通りを観察」から住民を押すと行き先がわかります。');
 })();

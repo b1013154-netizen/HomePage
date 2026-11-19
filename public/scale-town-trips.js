@@ -23,7 +23,7 @@ const TownTrips=(()=>{
    return points.reverse();
  }
  function timeline(){return {legs:[],length:0}}
- function wait(t,seconds,extras=[]){t.legs.push({end:t.length+=seconds,seconds,extras})}
+ function wait(t,seconds,extras=[]){t.legs.push({end:t.length+=seconds,seconds,extras,activity:t.activity,destination:t.destination})}
  function move(t,path,kind,j,extras=[]){
    if(path.length>2){const lane=kind==='walk'?.27:kind==='bus'?.09:.13;
      path=path.map((point,i)=>{if(!i||i===path.length-1)return point;const before=path[i-1],after=path[i+1],dx=after[0]-before[0],dy=after[1]-before[1],len=Math.hypot(dx,dy)||1;
@@ -32,7 +32,7 @@ const TownTrips=(()=>{
    const speed={walk:.42,car:1.05,cycle:.76,scooter:.69,bus:.85}[kind];let heading=0,previous=null;
    for(let i=1;i<path.length;i++){const a=path[i-1],b=path[i],len=distance(a,b);if(len<.001)continue;
      heading=Math.atan2(b[1]-a[1],b[0]-a[0]);const seconds=len/speed;
-     const leg={end:t.length+=seconds,seconds,a,b,heading,kind,j,extras};
+     const leg={end:t.length+=seconds,seconds,a,b,heading,kind,j,extras,activity:t.activity,destination:t.destination};
      if(previous){previous.next=heading;leg.prev=previous.heading}
      t.legs.push(leg);previous=leg;
    }return heading;
@@ -45,22 +45,22 @@ const TownTrips=(()=>{
    const parking=doors.filter(e=>e.b.id===46),stops=doors.filter(e=>e.b.id===24),people=[];
    const streets=(a,b)=>route(a.road,b.road,st.net);
    for(let j=0;j<30&&homes.length&&destinations.length;j++){
-     const h=homes[j%homes.length],d=destinations[(j*5+Math.floor(j/5))%destinations.length],t=timeline();
+     const h=homes[j%homes.length],d=destinations[(j*5+Math.floor(j/5))%destinations.length],t=timeline();t.home=Town.items[h.b.id].name;t.destination=Town.items[d.b.id].name;t.activity='買い物へ';
      const car=j%4===2&&Math.floor(j/2)%3!==0,kind=car?'car':j%5===4?'scooter':j%4===3?'cycle':'walk';
      const lot=car?parking[Math.floor(j/4)>>1]:null;
      const park=lot||d,points=streets(h,park),home=center(h.road),stop=center(park.road);
      const bay=lot?[lot.b.x+Town.sizes[lot.b.s].n*(Math.floor(j/4)%2?.69:.31),lot.b.y+Town.sizes[lot.b.s].n*.53]:[stop[0]+(park.door[0]-stop[0])*.48,stop[1]+(park.door[1]-stop[1])*.48];
      const foot=lot?[bay,park.door,...streets(park,d),d.door]:[bay,d.door];
      if(kind==='walk'){
-       const path=[h.door,...points,d.door];move(t,path,'walk',j);wait(t,5);move(t,path.slice().reverse(),'walk',j);
+       const path=[h.door,...points,d.door];move(t,path,'walk',j);t.activity='店内で買い物';wait(t,5);t.activity='帰宅中';t.destination=t.home;move(t,path.slice().reverse(),'walk',j);
      }else{
        const ride=[...points,...(lot?[park.door]:[]),bay];move(t,[h.door,home],'walk',j);
        const angle=move(t,ride,kind,j),vehicle=[fixed(bay,kind==='cycle'?'bikeRack':kind==='scooter'?'scooterRack':kind,j,angle)];
-       wait(t,1,vehicle);move(t,foot,'walk',j,vehicle);wait(t,5,vehicle);
+       wait(t,1,vehicle);move(t,foot,'walk',j,vehicle);t.activity='店内で買い物';wait(t,5,vehicle);t.activity='帰宅中';t.destination=t.home;
        move(t,foot.slice().reverse(),'walk',j,vehicle);wait(t,.9,vehicle);
        move(t,ride.slice().reverse(),kind,j);move(t,[home,h.door],'walk',j);
      }
-     wait(t,4);people.push(t);
+     t.activity='自宅で休憩';wait(t,4);people.push(t);
    }
    const bus=timeline(),passengers=[];
    if(stops.length>=2)for(let i=0;i<stops.length;i++){
@@ -75,11 +75,11 @@ const TownTrips=(()=>{
  }
  function sample(t,time,out){
    const q=time%t.length,leg=t.legs.find(l=>q<l.end);if(!leg)return;
-   out.push(...leg.extras);if(!leg.kind)return;
+   out.push(...leg.extras.map(actor=>({...actor,home:t.home,destination:leg.destination,activity:'駐車中'})));if(!leg.kind)return;
    const u=1-(leg.end-q)/leg.seconds;
    const delta=a=>Math.atan2(Math.sin(a-leg.heading),Math.cos(a-leg.heading));
    const angle=leg.heading+(u<.25&&leg.prev!==undefined?delta(leg.prev)*(.5-2*u):u>.75&&leg.next!==undefined?delta(leg.next)*(2*u-1.5):0);
-   out.push({kind:leg.kind,j:leg.j,phase:time*(leg.kind==='walk'?6:9),pose:{x:leg.a[0]+(leg.b[0]-leg.a[0])*u,y:leg.a[1]+(leg.b[1]-leg.a[1])*u,angle}});
+   out.push({home:t.home,destination:leg.destination,activity:leg.activity,kind:leg.kind,j:leg.j,phase:time*(leg.kind==='walk'?6:9),pose:{x:leg.a[0]+(leg.b[0]-leg.a[0])*u,y:leg.a[1]+(leg.b[1]-leg.a[1])*u,angle}});
  }
  function actors({people,bus,passengers},time,pop){
    const out=[];people.slice(0,Math.ceil(pop/4)).forEach((t,i)=>sample(t,time+i*5.37,out));

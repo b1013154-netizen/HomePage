@@ -14,13 +14,15 @@ function townMap(canvas,api){
  function setZoom(k){zoom=Math.max(.25,Math.min(5,zoom*k))}
  canvas.onwheel=e=>{e.preventDefault();setZoom(e.deltaY>0?.88:1.14)};
  canvas.oncontextmenu=e=>e.preventDefault();canvas.onpointerdown=e=>{
- if(drag)return;const start=cell(e);drag={id:e.pointerId,start,last:start,moving:api.mode()==='hand'||e.button===2||e.shiftKey,cx:e.clientX,cy:e.clientY};hover=start;canvas.setPointerCapture(e.pointerId)};
- canvas.onpointermove=e=>{if(drag&&e.pointerId!==drag.id)return;if(drag?.moving){panX+=e.clientX-drag.cx;panY+=e.clientY-drag.cy;drag.cx=e.clientX;drag.cy=e.clientY;hover=null;return}hover=cell(e);if(drag)drag.last=hover};
- canvas.onpointerup=e=>{if(e.pointerId!==drag?.id)return;const d=drag;drag=null;const end=cell(e);if(d.moving)return;if(e.clientX<canvas.getBoundingClientRect().left||e.clientX>canvas.getBoundingClientRect().right||e.clientY<canvas.getBoundingClientRect().top||e.clientY>canvas.getBoundingClientRect().bottom)return;
+ if(drag)return;const start=cell(e);drag={id:e.pointerId,start,last:start,distance:0,moving:api.mode()==='hand'||e.button===2||e.shiftKey,cx:e.clientX,cy:e.clientY};hover=start;canvas.setPointerCapture(e.pointerId)};
+ canvas.onpointermove=e=>{if(drag&&e.pointerId!==drag.id)return;if(drag)drag.distance+=Math.hypot(e.clientX-drag.cx,e.clientY-drag.cy);if(drag?.moving){panX+=e.clientX-drag.cx;panY+=e.clientY-drag.cy;drag.cx=e.clientX;drag.cy=e.clientY;hover=null;return}hover=cell(e);if(drag)drag.last=hover};
+ canvas.onpointerup=e=>{if(e.pointerId!==drag?.id)return;const d=drag;drag=null;const end=cell(e);if(d.moving&&d.distance>5)return;
+ if(d.distance<6&&['hand','inspect'].includes(api.mode())){const r=canvas.getBoundingClientRect();let best=null,dist=18;for(const actor of visibleActors){if(actor.kind!=='walk')continue;const [x,y]=project(actor.pose.x,actor.pose.y,.2),delta=Math.hypot(x-e.clientX+r.left,y-e.clientY+r.top);if(delta<dist){best=actor;dist=delta}}if(best){pickedResident=best.j;api.resident(best);return}}
+if(e.clientX<canvas.getBoundingClientRect().left||e.clientX>canvas.getBoundingClientRect().right||e.clientY<canvas.getBoundingClientRect().top||e.clientY>canvas.getBoundingClientRect().bottom)return;
  if(api.mode()==='zone')api.zone(zoneCells(d.start,end));else if(api.mode()==='build'&&api.item()<2)api.placeRoad(path(d.start,end));else api.tap(end)};
  canvas.onpointercancel=canvas.onlostpointercapture=()=>{drag=null};canvas.onpointerleave=()=>{if(!drag)hover=null};
  function depth(x,y){const [a,b]=rotate(x,y);return a+b}
- let trafficState, trafficKey, trips;
+ let trafficState, trafficKey, trips,visibleActors=[],pickedResident=null;
  function paint(t){
  requestAnimationFrame(paint);if(t-last<28||!w||document.hidden)return;const dt=Math.min(.1,(t-last)/1000);last=t;if(api.running())trafficTime+=dt*api.running();
  const c=api.city(),N=Town.dimension(c),st=api.stats(),night=api.night(),v=TownArt.view(ctx,project,rotation,night);
@@ -56,12 +58,15 @@ function townMap(canvas,api){
  for(let j=0;j<15;j++){const x=j%2?N+.46:-.47,y=1+j*1.02;if(y>17.6)continue;list.push({d:depth(x,y),draw:()=>v.tree(x,y,.72+(j%3)*.13)})}
  if(ghost){const n=Town.sizes[ghost.s].n;list.push({d:depth(ghost.x+n/2,ghost.y+n/2),draw:()=>{ctx.globalAlpha=.55;v.structure(ghost,c.theme);ctx.globalAlpha=1}})}
  if(st!==trafficState){trafficState=st;const k=c.buildings.map(b=>[b.x,b.y,b.id,b.s,b.dir||0].join(',')).join(';');if(k!==trafficKey){trips=TownTrips.plan(c,st);trafficKey=k}}
- for(const actor of TownTrips.actors(trips,trafficTime,c.pop)){const {pose,kind,j,phase}=actor;list.push({d:depth(pose.x,pose.y),draw:()=>StreetMotion.draw(ctx,project,pose,kind,j,phase,night)})}
+ visibleActors=TownTrips.actors(trips,trafficTime,c.pop);
+ for(const actor of visibleActors){const {pose,kind,j,phase}=actor;list.push({d:depth(pose.x,pose.y),draw:()=>StreetMotion.draw(ctx,project,pose,kind,j,phase,night)})}
+ const selected=api.selected();if(selected){const n=Town.sizes[selected.s].n;v.tile(selected.x,selected.y,n,n,.03,'#f0ce8677','#bb7c3c')}
+ const observed=visibleActors.find(a=>a.kind==='walk'&&a.j===pickedResident);if(observed){const [x,y]=project(observed.pose.x,observed.pose.y,.46);ctx.fillStyle='#234b43';ctx.fillRect(x-68,y-21,136,20);ctx.fillStyle='#fff7dc';ctx.font='11px sans-serif';ctx.textAlign='center';ctx.fillText(observed.destination||'移動中',x,y-7,128);ctx.textAlign='start'}
  list.sort((a,b)=>a.d-b.d).forEach(o=>o.draw());
  if(night){ctx.fillStyle='#182a4c45';ctx.fillRect(0,0,w,h);for(const b of c.buildings){if(b.id>1&&Town.items[b.id].group===1&&st.active.has(b)){const [x,y]=project(b.x+.68,b.y+.68,.24),r=12*base*zoom,gl=ctx.createRadialGradient(x,y,0,x,y,r);gl.addColorStop(0,'#ffde8f88');gl.addColorStop(1,'#ffd18000');ctx.fillStyle=gl;ctx.fillRect(x-r,y-r,r*2,r*2)}}}
  }
  requestAnimationFrame(paint);
- return {street(){
+ return {focus(b){zoom=4.2;panX=0;panY=0;const n=Town.sizes[b.s].n,[px,py]=project(b.x+n/2,b.y+n/2,.25);panX=w/2-px;panY=h*.55-py},street(){
  const s=api.stats(),roads=Array.from(s.net,k=>k.split(',').map(Number));
  if(!roads.length)return;
  const shops=Array.from(s.active).filter(b=>Town.items[b.id].group===1);
