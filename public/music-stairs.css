@@ -13,3 +13,5 @@
 .hero{margin-bottom:18px;padding-bottom:5px}.hero h1{font-size:clamp(1.7rem,4vw,2.8rem)}.hero small{display:none}#stage{height:clamp(210px,35vh,360px)}.studio-tabs{display:flex;flex-wrap:wrap;gap:7px;margin:22px 0}.studio-tabs button[aria-selected=true]{background:#9cf2d1;color:#13241f}.studio-tabs button:focus-visible{outline:2px solid #f3d191;outline-offset:3px}[role=tabpanel][hidden]{display:none!important}@media print{[role=tabpanel]{display:block!important}.studio-tabs{display:none}}
 
 #stage #board{height:100%;width:100%}@media print{main>[role=tabpanel]{display:block!important}main>[role=tabpanel]>section:not(#sheet){display:none!important}}
+
+@media print{main>#music-panel-3,main>#music-panel-3[hidden]{display:block!important}main>#music-panel-3>section:not(#sheet){display:none!important}}

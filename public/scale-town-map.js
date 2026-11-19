@@ -4,7 +4,15 @@ function townMap(canvas,api){
  let rotation=0,zoom=1,panX=0,panY=0,w=0,h=0,base=1,hover=null,drag=null,last=0,trafficTime=0;
  function rotate(x,y){return [[x,y],[y,-x],[-x,-y],[-y,x]][rotation]}
  function project(x,y,z=0){const [a,b]=rotate(x-8.2,y-8.6),k=base*zoom;return [w*.5+panX+(a-b)*W*k,h*.51+panY+((a+b)*H-z*Z)*k]}
- function cell(e){const r=canvas.getBoundingClientRect(),k=base*zoom,dx=(e.clientX-r.left-w*.5-panX)/(W*k),dy=(e.clientY-r.top-h*.51-panY)/(H*k),a=(dx+dy)*.5,b=(dy-dx)*.5,[x,y]=[[a,b],[-b,a],[-a,-b],[b,-a]][rotation];return {x:Math.floor(x+8.2),y:Math.floor(y+8.6)}}
+ function cell(e,z=0){const r=canvas.getBoundingClientRect(),k=base*zoom,dx=(e.clientX-r.left-w*.5-panX)/(W*k),dy=(e.clientY-r.top-h*.51-panY)/(H*k)+z*Z/H,a=(dx+dy)*.5,b=(dy-dx)*.5,[x,y]=[[a,b],[-b,a],[-a,-b],[b,-a]][rotation];return {x:Math.floor(x+8.2),y:Math.floor(y+8.6)}}
+ function hitBuilding(e){
+ const list=api.city().buildings.filter(b=>b.id>=2).sort((a,b)=>depth(b.x+.5,b.y+.5)-depth(a.x+.5,a.y+.5));
+ for(const b of list){const v=Town.items[b.id],sz=Town.sizes[b.s];
+ const floors=({tower:7,flat:3,department:4,library:2,school:3,mixed:2,cinema:2,glass:2,court:3,fire:2,photo:2})[v.form]||1;
+ const height=sz.draw*(['resTower','skyGarden','terraces','office','stationMall','cityCentre'].includes(v.form)?2.6:.8+(floors-1)*.31);
+ for(let z=height;z>=0;z-=.06){const c=cell(e,z);if(c.x>=b.x&&c.x<b.x+sz.n&&c.y>=b.y&&c.y<b.y+sz.n)return b}
+ }return null;
+ }
  function resize(){w=canvas.clientWidth;h=canvas.clientHeight;base=Math.min(w/880,h/480);const dpr=Math.min(2,devicePixelRatio);canvas.width=w*dpr;canvas.height=h*dpr;ctx.setTransform(dpr,0,0,dpr,0,0)}
  new ResizeObserver(resize).observe(canvas);resize();
  function path(a,b){const cells=[{...a}];let {x,y}=a;while(x!==b.x){x+=Math.sign(b.x-x);cells.push({x,y})}while(y!==b.y){y+=Math.sign(b.y-y);cells.push({x,y})}return cells}
@@ -19,6 +27,7 @@ function townMap(canvas,api){
  canvas.onpointerup=e=>{if(e.pointerId!==drag?.id)return;const d=drag;drag=null;const end=cell(e);if(d.moving&&d.distance>5)return;
  if(d.distance<6&&['hand','inspect'].includes(api.mode())){const r=canvas.getBoundingClientRect();let best=null,dist=18;for(const actor of visibleActors){if(actor.kind!=='walk')continue;const [x,y]=project(actor.pose.x,actor.pose.y,.2),delta=Math.hypot(x-e.clientX+r.left,y-e.clientY+r.top);if(delta<dist){best=actor;dist=delta}}if(best){pickedResident=best.j;api.resident(best);return}}
 if(e.clientX<canvas.getBoundingClientRect().left||e.clientX>canvas.getBoundingClientRect().right||e.clientY<canvas.getBoundingClientRect().top||e.clientY>canvas.getBoundingClientRect().bottom)return;
+ if(['build','inspect','hand'].includes(api.mode())){const b=hitBuilding(e);if(b){api.tap({x:b.x,y:b.y});return}}
  if(api.mode()==='zone')api.zone(zoneCells(d.start,end));else if(api.mode()==='build'&&api.item()<2)api.placeRoad(path(d.start,end));else api.tap(end)};
  canvas.onpointercancel=canvas.onlostpointercapture=()=>{drag=null};canvas.onpointerleave=()=>{if(!drag)hover=null};
  function depth(x,y){const [a,b]=rotate(x,y);return a+b}
