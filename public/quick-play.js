@@ -26,11 +26,40 @@
   let id;
   try { id=localStorage.getItem('quick-play-id') || crypto.randomUUID();localStorage.setItem('quick-play-id',id); } catch { id=crypto.randomUUID(); }
   let step=0, answers=[], reports=[], timer, textResult='',resultColor='';
+  votes.push(...QuickCatalog.votes);
+  goods.push(...QuickCatalog.goods);
+  exhibits.push(...QuickCatalog.exhibits);
+  scenes.push(...QuickCatalog.scenes);
+  for(let h=0;h<24;h++)for(const light of [30,45,60,75])colors.push('hsl('+h*15+' 72% '+light+'%)');
+  const exhibitsFor=['持ち帰れるのは、一個だけ。',...QuickCatalog.exhibitPrompts];
+  const api='https://homepage.b1013154.workers.dev/api/quick-choice';
+  let deck=[],measureDeck=[],holidayTheme='',revision=0;
+  function shuffled(items,random=Math.random){
+    const copy=[...items];
+    for(let i=copy.length-1;i>0;i--){const j=Math.floor(random()*(i+1));[copy[i],copy[j]]=[copy[j],copy[i]]}
+    return copy;
+  }
+  function indexes(list){return list.map((_,i)=>i)}
   function node(tag,text='',cls=''){const e=document.createElement(tag);e.textContent=text;if(cls)e.className=cls;return e}
   function add(tag,text,cls){const e=node(tag,text,cls);panel.append(e);return e}
   function button(parent,label,fn,cls){const b=node('button',label,cls);b.type='button';b.onclick=fn;parent.append(b);return b}
   function start(count,label){panel.replaceChildren();if(count)add('p',(step+1)+' / '+count,'step');add('h2',label)}
   function options(labels,fn){const box=add('div','','choices');labels.forEach((v,i)=>button(box,v,()=>fn(i)))}
+  function browse(labels,choose,order=shuffled(indexes(labels))){
+    const controls=add('div','','browse'),search=node('input'),box=add('div','','choices'),nav=add('div','','pager');
+    search.type='search';search.placeholder='候補を検索';search.setAttribute('aria-label','候補を検索');controls.append(search);
+    let page=0;
+    function show(){
+      const filtered=order.filter(i=>labels[i].includes(search.value.trim())),pages=Math.ceil(filtered.length/6);
+      box.replaceChildren();nav.replaceChildren();
+      if(!pages){box.append(node('p','一致する候補がありません。'));return}
+      filtered.slice(page*6,page*6+6).forEach(i=>button(box,labels[i],()=>choose(i)));
+      button(nav,'前へ',()=>{page--;show()}).disabled=page===0;
+      nav.append(node('span',(page+1)+' / '+pages+' ページ・'+filtered.length+'候補','small'));
+      button(nav,'次へ',()=>{page++;show()}).disabled=page+1===pages;
+    }
+    search.oninput=()=>{page=0;show()};show();
+  }
   function next(fn){step++;fn();panel.scrollIntoView({block:'nearest'})}
   function actions(){return add('div','','actions')}
   function result(summary,details,again){
@@ -56,80 +85,175 @@
     const link=document.createElement('a');link.href=canvas.toDataURL();link.download=title+'.png';link.click();
   }
   async function submit(q,value,done){
+    const version=revision;
     panel.querySelectorAll('button,input').forEach(b=>b.disabled=true);
     const status=add('p','集計しています…','small');
     try {
-      const r=await fetch('https://homepage.b1013154.workers.dev/api/quick-choice',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,game,question:q,value}),signal:AbortSignal.timeout(12000)});
-      if(!r.ok)throw Error();const data=await r.json();answers[q]=value;reports[q]=data;done(data);
-    } catch {status.textContent='集計に接続できませんでした。同じ回答で再試行できます。';button(panel,'再試行',()=>{status.remove();submit(q,value,done)})}
+      const r=await fetch(api,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,game,question:q,value}),signal:AbortSignal.timeout(12000)});
+      if(!r.ok)throw Error();const data=await r.json();if(version!==revision)return;answers[step]=value;reports[step]=data;done(data);
+    } catch {if(version!==revision)return;status.textContent='集計に接続できませんでした。同じ回答で再試行できます。';button(panel,'再試行',()=>{status.remove();submit(q,value,done)})}
   }
   function bars(labels,counts,n){labels.forEach((s,i)=>{const pct=Math.round(counts[i]*100/n);add('p',s+'　'+pct+'％（'+counts[i]+'票）');const b=add('span','','bar');const iTag=node('i');iTag.style.width=pct+'%';b.append(iTag)})}
   function vote(){
-    if(step===votes.length){start(0,'あなたの5票');const minor=votes.filter((_,i)=>reports[i].counts[answers[i]]*2<reports[i].n);
-      result('5問中、少数派だったのは '+minor.length+' 問。',votes.map((q,i)=>q[0]+' → '+q[1+answers[i]]+'（'+Math.round(reports[i].counts[answers[i]]*100/reports[i].n)+'％）'));return}
-    const [q,...labels]=votes[step];start(5,q);options(labels,i=>submit(step,i,d=>{
+    if(step===deck.length){start(0,'あなたの5票');const minor=deck.filter((_,i)=>reports[i].counts[answers[i]]*2<reports[i].n);
+      result('5問中、少数派だったのは '+minor.length+' 問。',deck.map((k,i)=>votes[k][1+answers[i]]+'（'+Math.round(reports[i].counts[answers[i]]*100/reports[i].n)+'％）'));return}
+    const k=deck[step],[q,...labels]=votes[k];start(5,q);options(labels,i=>submit(k,i,d=>{
       start(5,q);add('p','あなたの一票　'+labels[i]+' ／ 集計 '+d.n+'人');bars(labels,d.counts,d.n);
       button(actions(),step===4?'結果を見る':'次の二択へ',()=>next(vote),'main')}))
   }
   function price(){
-    if(step===3){start(0,'あなたの買い付け伝票');result('3品の合計は '+answers.reduce((a,b)=>a+b,0).toLocaleString()+' 円',goods.map((g,i)=>g[0]+'　'+answers[i]+'円 ／ 中央値 '+reports[i].median+'円'));return}
-    const [name,desc,art]=goods[step];start(3,name);add('div',art,'art');add('p',desc);
+    if(step===3){start(0,'あなたの買い付け伝票');result('3品の合計は '+answers.reduce((a,b)=>a+b,0).toLocaleString()+' 円',deck.map((k,i)=>goods[k][0]+'　'+answers[i]+'円 ／ 中央値 '+reports[i].median+'円'));return}
+    const k=deck[step],[name,desc,art]=goods[k];start(3,name);add('div',art,'art');add('p',desc);
     const label=add('label','あなたの値札（0〜1,000,000円） '),input=node('input');input.type='number';input.min=0;input.max=1000000;input.step=1;input.required=true;input.inputMode='numeric';label.append(input);
-    button(actions(),'値札を付ける',()=>{if(!input.reportValidity())return;const v=input.valueAsNumber;submit(step,v,d=>{
+    button(actions(),'値札を付ける',()=>{if(!input.reportValidity())return;const v=input.valueAsNumber;submit(k,v,d=>{
       start(3,name);add('p','あなたの値札 '+v.toLocaleString()+' 円','value');add('p',d.n+' 人の中央値は '+d.median.toLocaleString()+' 円です。');
       button(actions(),step===2?'伝票を見る':'次の品物へ',()=>next(price),'main')})},'main')
   }
   function measure(){
-    if(step===3){start(0,'私の言葉のものさし');result('「すぐ行く」は'+answers[0]+'分後。'+ '私の一口はケーキの'+answers[2]+'％。',['「そこそこ混んでる」は '+answers[1]+' 人待ち。']);return}
-    const [q,max,unit,initial]=measureQs[step];start(3,q);const art=add('div','','art'),c=node('canvas');c.width=400;c.height=150;art.append(c);
+    if(step===3){start(0,'私の言葉のものさし');result('私の感覚を測ったら…',measureDeck.map(([q,,unit],i)=>q+'　'+answers[i]+unit));return}
+    const [q,max,unit,initial]=measureDeck[step];start(3,q);const art=add('div','','art'),c=node('canvas');c.width=400;c.height=150;art.append(c);
     const range=add('input');range.type='range';range.min=0;range.max=max;range.value=initial;range.setAttribute('aria-label',q);
     const out=add('output','','value');function paint(){const v=+range.value,ctx=c.getContext('2d');ctx.clearRect(0,0,400,150);out.textContent=v+unit;range.setAttribute('aria-valuetext',v+unit);
-      if(step===1){ctx.font='22px sans-serif';for(let i=0;i<v;i++)ctx.fillText('🚶',12+(i%10)*38,32+Math.floor(i/10)*33);return}
+      if(step===1){ctx.font='16px sans-serif';for(let i=0;i<v;i++)ctx.fillText('🚶',8+(i%20)*19,30+Math.floor(i/20)*24);return}
       ctx.beginPath();ctx.arc(200,75,62,0,2*Math.PI);ctx.fillStyle=step===0?'#fffdf6':'#c38858';ctx.fill();ctx.strokeStyle='#846a50';ctx.stroke();
       ctx.beginPath();ctx.moveTo(200,75);ctx.arc(200,75,59,-Math.PI/2,-Math.PI/2+2*Math.PI*v/max);ctx.closePath();ctx.fillStyle=step?'#f5c8b4':'#99c7b8';ctx.fill();
       if(!step){for(let i=0;i<12;i++){const a=i*Math.PI/6;ctx.fillRect(199+54*Math.sin(a),74-54*Math.cos(a),3,3)}ctx.beginPath();ctx.moveTo(200,75);ctx.lineTo(200+48*Math.sin(2*Math.PI*v/max),75-48*Math.cos(2*Math.PI*v/max));ctx.stroke()}
     }range.oninput=paint;paint();button(actions(),'これくらい',()=>{answers.push(+range.value);next(measure)},'main')
   }
-  function holiday(){if(step<3){const [q,...opts]=holidayQs[step];start(3,q);options(opts,i=>{answers.push(i);next(holiday)});return}
-    const names=['二度寝記念日','遠回りの日','おやつ増量祭','読書解禁日','手紙日和'];start(0,'祝日制定のお知らせ');result('「'+names[answers[1]]+'」を制定します。',['日付　'+holidayQs[0][1+answers[0]],'祝し方　'+holidayQs[1][1+answers[1]],'禁止事項　'+holidayQs[2][1+answers[2]]])}
-  function exhibit(){start(0,'持ち帰れるのは、一個だけ。');add('p','展示品を選ぶと、あなたの引換券を発行します。');options(exhibits,i=>submit(0,i,d=>{
-    start(0,'展示品引換券');const best=Math.max(...d.counts);result('私が持ち帰るのは「'+exhibits[i]+'」。',['同じ展示品を選んだ人　'+d.counts[i]+' / '+d.n+'人','最多の展示品　'+exhibits.filter((_,k)=>d.counts[k]===best).join('・')]);bars(exhibits,d.counts,d.n)
-  }))}
-  function color(){start(0,'どの情景の色を探す？');options(scenes,q=>{start(0,'「'+scenes[q]+'」はどの色？');const grid=add('div','','colors');let selected=-1;const pick=button(actions(),'この色を選ぶ',()=>submit(q,selected,d=>{
+  function holiday(){
+    if(step<3){
+      const [q,...original]=holidayQs[step],labels=[...original,...QuickCatalog.holidayOptions[step]];
+      start(3,q);add('p',holidayTheme,'ticket');
+      browse(labels,i=>{answers.push(labels[i]);next(holiday)});return;
+    }
+    start(0,'祝日制定のお知らせ');
+    result('「'+answers[1]+'日」を制定します。',[holidayTheme,'日付　'+answers[0],'禁止事項　'+answers[2]]);
+  }
+  function exhibit(){
+    start(0,'どんな気持ちで展示を巡る？');
+    browse(exhibitsFor,q=>{
+      start(0,exhibitsFor[q]);add('p','持ち帰る展示品を選ぶと、引換券を発行します。');
+      browse(exhibits,i=>submit(q,i,d=>{
+        start(0,'展示品引換券');
+        const ranking=indexes(exhibits).filter(k=>d.counts[k]>0).sort((a,b)=>d.counts[b]-d.counts[a]).slice(0,5);
+        result('私が持ち帰るのは「'+exhibits[i]+'」。',[exhibitsFor[q],'同じ展示品を選んだ人　'+d.counts[i]+' / '+d.n+'人']);
+        add('h3','このお題で選ばれた展示品');bars(ranking.map(k=>exhibits[k]),ranking.map(k=>d.counts[k]),d.n);
+      }));
+    });
+  }
+  function color(){start(0,'どの情景の色を探す？');browse(scenes,q=>{start(0,'「'+scenes[q]+'」はどの色？');
+const grid=add('div','','colors');let selected=-1;const pick=button(actions(),'この色を選ぶ',()=>submit(q,selected,d=>{
     resultColor=colors[selected];start(0,scenes[q]+'のモザイク');const mosaic=add('div','','mosaic');d.counts.forEach((n,i)=>{if(n){const s=node('span');s.style.flex=n;s.style.background=colors[i];s.title=n+'人';mosaic.append(s)}});add('p','帯の幅は、その色を選んだ人数を表します。','small');add('div','あなたの色　#'+(selected+1),'ticket').style.borderLeft='24px solid '+colors[selected];result('「'+scenes[q]+'」に選んだ色は #'+(selected+1)+'。',['同じ色を選んだ人は、自分を含めて '+d.counts[selected]+' / '+d.n+' 人。'])
   }),'main');pick.disabled=true;colors.forEach((col,i)=>{const b=button(grid,'',()=>{selected=i;grid.querySelectorAll('button').forEach((el,j)=>el.setAttribute('aria-pressed',String(i===j)));pick.disabled=false});b.style.background=col;b.setAttribute('aria-label','色 '+(i+1));b.setAttribute('aria-pressed','false')})})}
 
+  const inventory = ('🍎りんご 🍐洋梨 🍊みかん 🍋レモン 🍌バナナ 🍉スイカ 🍇ぶどう 🍓いちご 🫐ブルーベリー 🍈メロン 🍒さくらんぼ 🍑もも 🥭マンゴー 🍍パイナップル 🥥ココナッツ 🥝キウイ 🍅トマト 🥑アボカド 🍆なす 🥔じゃがいも 🥕にんじん 🌽とうもろこし 🫑ピーマン 🥒きゅうり 🥦ブロッコリー 🧄にんにく 🧅たまねぎ 🍄きのこ 🥜落花生 🌰栗 🍞食パン 🥐クロワッサン 🥖バゲット 🥨プレッツェル 🥯ベーグル 🥞パンケーキ 🧇ワッフル 🧀チーズ 🍖骨付き肉 🥓ベーコン 🍔ハンバーガー 🍟フライドポテト 🍕ピザ 🌭ホットドッグ 🥪サンドイッチ 🌮タコス 🍳目玉焼き 🥗サラダ 🍿ポップコーン 🍙おにぎり 🍘せんべい 🍥なると 🍡団子 🍩ドーナツ 🍪クッキー 🎂誕生日ケーキ 🍫チョコ 🍬キャンディ 🍭ペロペロキャンディ 🍮プリン 🍯はちみつ 🫖ティーポット ☕コーヒー 🥛牛乳 🧃紙パックジュース 🧊氷 🥄スプーン 🍴フォークとナイフ 🥢箸 🧂塩入れ 🧸ぬいぐるみ 🪆マトリョーシカ 🎈風船 🪁たこ 🧩パズル 🎲サイコロ ♟️チェスの駒 🪀ヨーヨー 🎯ダーツ盤 🎳ボウリング 🎾テニスボール ⚽サッカーボール 🏀バスケットボール 🏈アメフトボール 🥏フリスビー 🥊グローブ 🛼ローラースケート 🎸ギター 🎺トランペット 🎻バイオリン 🪕バンジョー 🥁太鼓 🎹鍵盤 🎤マイク 🎧ヘッドホン 📻ラジオ 📷カメラ ⏰目覚まし時計 ⌛砂時計 🧭方位磁針 🔦懐中電灯 🕯️ろうそく 💡電球 🔑鍵 🔔ベル 🧲磁石 🔍虫眼鏡 ✂️はさみ 📌画びょう 📎クリップ 📏定規 🖌️絵筆 🖍️クレヨン ✏️鉛筆 🧮そろばん 📓ノート ✉️封筒 📅カレンダー 🗺️地図 🎨パレット 👒麦わら帽子 👓めがね 🕶️サングラス 👑王冠 🧤手袋 🧣マフラー 👢ブーツ ☂️傘 🎒リュック 👜ハンドバッグ').split(' ').map(entry=>entry.match(/^([^ぁ-んァ-ヶ一-龠]+)(.+)$/u).slice(1));
   function memory(){
     const date=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Tokyo'}).format(new Date());
-    let seed=Number(date.replaceAll('-',''));function random(limit){seed=(Math.imul(seed,1664525)+1013904223)>>>0;return Math.floor(seed/4294967296*limit)}
-    const chairs=2+random(4),cups=1+random(4),pet=['🐈','🐇','🐕'][random(3)],plant=1+random(3);
-    const menu=['プリン','トースト','パフェ','タルト'][random(4)],curtain=random(2);
-    const questions=[['椅子は何脚あった？',['2脚','3脚','4脚','5脚'],chairs-2],['窓辺にいたのは？',['猫','うさぎ','犬'],['🐈','🐇','🐕'].indexOf(pet)],['カップは何個？',['1個','2個','3個','4個'],cups-1],['黒板のメニューは？',['プリン','トースト','パフェ','タルト'],['プリン','トースト','パフェ','タルト'].indexOf(menu)],['鉢植えはいくつ？',['1鉢','2鉢','3鉢'],plant-1]];
-    for(let i=questions.length-1;i>0;i--){const j=random(i+1);[questions[i],questions[j]]=[questions[j],questions[i]]}
-    const quiz=questions.slice(0,3);
+    let seed=Number(date.replaceAll('-',''));
+    function random(){seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296}
+    const stock=shuffled(indexes(inventory),random),display=stock.slice(0,6);
+    const names=inventory.map(item=>item[1]),spots=['上段の左','上段の中央','上段の右','下段の左','下段の中央','下段の右'];
+    const [a,b,c]=shuffled([0,1,2,3,4,5],random);
+    const side=i=>i%3===2?-1:1;
+    const quiz=[[names[display[b]]+'を飾っていた棚で、'+spots[a]+'に置かれていた品は？',display[a]],
+      [names[display[b]]+'の'+(side(b)>0?'右':'左')+'隣にあった品は？',display[b+side(b)]],
+      [names[display[c]]+'の真'+(c<3?'下':'上')+'にあった品は？',display[(c+3)%6]]];
+    const orders=quiz.map(([,correct])=>{
+      const others=shuffled(stock.filter(k=>k!==correct),random);
+      return [...shuffled([correct,...others.slice(0,5)],random),...others.slice(5)];
+    });
     function draw(){
-      const c=add('canvas','','scene');c.width=700;c.height=355;c.setAttribute('aria-label','今日の喫茶店の観察イラスト');
-      const g=c.getContext('2d');function rect(x,y,w,h,col){g.fillStyle=col;g.fillRect(x,y,w,h)}
-      function icon(x,y,t,size){g.font=size+'px "Segoe UI Emoji",sans-serif';g.fillText(t,x,y)}
-      rect(0,0,700,230,'#e2d1ad');rect(0,230,700,125,'#a47f5b');
-      for(let x=0;x<700;x+=40)rect(x,0,1,230,'#d3bf99');
-      rect(36,18,268,145,'#754f3c');rect(44,26,252,129,curtain?'#afc9c5':'#a8c6d6');
-      rect(165,23,6,132,'#8d674d');rect(44,83,252,4,'#947053');icon(76,151,pet,43);
-      rect(360,24,230,90,'#8a6346');rect(367,31,216,76,'#314a42');g.fillStyle='#f9ebc8';g.font='27px serif';g.fillText(menu,410,81);
-      for(let i=0;i<plant;i++)icon(416+i*68,171,'🪴',43);
-      rect(24,178,651,16,'#724c38');rect(38,194,620,40,'#bf9268');
-      for(let i=0;i<cups;i++)icon(45+i*80,175,'☕',35);
-      for(let i=0;i<chairs;i++){const x=48+i*126;rect(x,243,78,32,'#735440');rect(x,280,80,9,'#594538');rect(x+4,274,7,58,'#79583f');rect(x+69,274,7,58,'#79583f')}
+      const shelf=add('div','','shelf');shelf.setAttribute('aria-label','喫茶店の飾り棚');
+      display.forEach(k=>{const card=node('div');card.append(node('span',inventory[k][0]),node('small',names[k]));shelf.append(card)});
     }
-    function ask(){if(step===3){start(0,'今日の答え合わせ');draw();const n=quiz.filter((q,i)=>answers[i]===q[2]).length;
-      result(date+' の喫茶店　'+n+' / 3問正解',quiz.map((q,i)=>(answers[i]===q[2]?'○ ':'× ')+q[0]+'　'+q[1][q[2]]));return}
-      start(3,quiz[step][0]);options(quiz[step][1],i=>{answers.push(i);next(ask)})
+    function ask(){
+      if(step===3){start(0,'今日の答え合わせ');draw();const n=quiz.filter(([,k],i)=>answers[i]===k).length;
+        result(date+' の喫茶店　'+n+' / 3問正解',quiz.map(([q,k],i)=>(answers[i]===k?'○ ':'× ')+q+'　'+names[k]));return}
+      start(3,quiz[step][0]);browse(names,i=>{answers.push(i);next(ask)},orders[step]);
     }
-    start(0,date+' の喫茶店');add('p','絵を見る時間は5秒。そのあと、絵にまつわる3問に答えてください。');
-    button(actions(),'5秒だけ見る',()=>{start(0,'喫茶店をよく見てください');draw();const end=performance.now()+5000,clock=add('p','残り5秒');
+    start(0,date+' の喫茶店');add('p','今日の飾り棚には6つの品。5秒で品物と位置を覚えてください。');
+    button(actions(),'5秒だけ見る',()=>{start(0,'喫茶店の飾り棚');draw();const end=performance.now()+5000,clock=add('p','残り5秒');
       timer=setInterval(()=>{const left=Math.ceil((end-performance.now())/1000);if(left<=0){clearInterval(timer);ask()}else clock.textContent='残り'+left+'秒'},100)
-    },'main')
+    },'main');
   }
-  function reset(){clearInterval(timer);step=0;answers=[];reports=[];({vote,measure,price,holiday,memory,exhibit,color})[game]()}
+  function reset(first){
+    revision++;clearInterval(timer);step=0;answers=[];reports=[];
+    if(game==='vote'){
+      markMode('投票する');deck=shuffled(indexes(votes).filter(i=>i!==first));
+      if(Number.isInteger(first))deck.unshift(first);deck=deck.slice(0,5);
+    }
+    if(game==='price')deck=shuffled(indexes(goods)).slice(0,3);
+    if(game==='measure')measureDeck=QuickCatalog.measures.map((group,i)=>shuffled([...group,[measureQs[i][0],i===0?120:100,...measureQs[i].slice(2)]])[0]);
+    if(game==='holiday')holidayTheme=shuffled(QuickCatalog.holidayPrompts)[0];
+    ({vote,measure,price,holiday,memory,exhibit,color})[game]();
+  }
+  const modes=node('nav','','mode-tabs');
+  function markMode(label){for(const b of modes.children)b.setAttribute('aria-pressed',String(b.textContent===label))}
+  async function openPolls(mode){
+    const version=++revision;markMode(mode);start(0,mode);add('p','開票データを読み込み中…');
+    try{
+      const r=await fetch(api,{signal:AbortSignal.timeout(10000)});
+      if(!r.ok)throw Error();const {polls}=await r.json();if(version!==revision)return;
+      const rows=polls.filter(row=>votes[row.question]&&row.n>0);
+      start(0,mode);
+      if(mode==='接戦速報'){
+        const races=rows.filter(x=>x.leftVotes>0&&x.leftVotes<x.n).sort((a,b)=>Math.abs(a.leftVotes/a.n-.5)-Math.abs(b.leftVotes/b.n-.5)||b.n-a.n);
+        if(!races.length)add('p','まだ両方に票が入ったお題はありません。投票されたお題から順に速報に登場します。');
+        for(const row of races.slice(0,10)){
+          const [q,...ls]=votes[row.question];add('h3',q);bars(ls,[row.leftVotes,row.n-row.leftVotes],row.n);
+          button(actions(),'この対決に参加',()=>reset(row.question));
+        }
+      }else if(!rows.length)add('p','最初の投票が届くと、得票率を予想できます。');
+      else{
+        const row=shuffled(rows)[0],[q,left,right]=votes[row.question];
+        add('h3',q);add('p','「'+left+'」は何％？　もう一方は「'+right+'」。');
+        const slider=add('input');slider.type='range';slider.min=0;slider.max=100;slider.value=50;slider.setAttribute('aria-label',left+'の予想得票率');
+        const out=add('output','50％','value');slider.oninput=()=>out.textContent=slider.value+'％';
+        button(actions(),'実際の開票結果を見る',()=>{
+          const pct=Math.round(row.leftVotes*100/row.n),guess=+slider.value;
+          start(0,'得票率予想の結果');add('h3',q);bars([left,right],[row.leftVotes,row.n-row.leftVotes],row.n);
+          result(guess===pct?'ぴったり的中！':'予想と実際の差は '+Math.abs(guess-pct)+' ポイント。',['「'+left+'」の予想 '+guess+'％ ／ 実際 '+pct+'％（'+row.n+'票）']);
+          button(actions(),'もう一度予想する',()=>openPolls(mode));
+        },'main');
+      }
+    }catch{if(version!==revision)return;start(0,mode);add('p','開票データを読み込めませんでした。');button(actions(),'読み直す',()=>openPolls(mode))}
+  }
+  function simulate(){
+    ++revision;markMode('開票実験室');start(0,'開票実験室');
+    add('p','二つの陣営に票を配って、接戦や逆転を作ってみよう。実験用の票は自由に動かせます。');
+    const k=shuffled(indexes(votes))[0],[q,...labels]=votes[k];add('h3',q);
+    const ranges=labels.map(label=>{const field=add('label',label),input=node('input');input.type='range';input.min=0;input.max=100;input.value=50;field.append(input);return input});
+    const view=add('div','','ticket'),meter=add('div','','mosaic sim-meter'),left=node('span'),right=node('span');meter.append(left,right);
+    function paint(){const [a,b]=ranges.map(el=>+el.value);left.style.flex=a;right.style.flex=b;meter.hidden=!a&&!b;
+      view.textContent=labels[0]+' '+a+'票　／　'+labels[1]+' '+b+'票\n'+(!a&&!b?'開票前':a===b?'同票！ 次の一票で勝負が決まります。':'「'+labels[a>b?0:1]+'」がリード。逆転まであと '+(Math.abs(a-b)+1)+' 票。')}
+    ranges.forEach(el=>el.oninput=paint);paint();button(actions(),'別のお題で実験',simulate);
+  }
+  function ballotBox(){
+    ++revision;markMode('投票箱をつくる');
+    const candidates=[...new Set(votes.flatMap(([,a,b])=>[a,b]))],pair=[],tally=[0,0];
+    function setup(){
+      start(0,pair.length?'もう一方の候補を選ぶ':'投票箱をつくる');
+      add('p',pair.length?'一つ目の候補　'+pair[0]:'好きな候補を二つ組み合わせて、この端末で一緒にいる人たちに投票してもらえます。');
+      const remaining=candidates.filter(label=>!pair.includes(label));
+      browse(remaining,i=>{pair.push(remaining[i]);if(pair.length===2)cast();else setup()});
+    }
+    function cast(){
+      start(0,'どちらに一票？');options(pair,i=>{
+        tally[i]++;start(0,'投票箱に入りました');add('p','投票済み '+(tally[0]+tally[1])+' 人');
+        button(actions(),'次の人に渡す',cast);button(actions(),'投票を締め切って開票',finish,'main');
+      });
+    }
+    function finish(){
+      start(0,'みんなの投票箱・開票結果');const n=tally[0]+tally[1];bars(pair,tally,n);
+      result(tally[0]===tally[1]?'両者同票！':'勝ったのは「'+pair[Number(tally[1]>tally[0])]+'」！',pair.map((label,i)=>label+'　'+tally[i]+'票'));
+      button(actions(),'新しい投票箱をつくる',ballotBox);
+    }
+    setup();
+  }
+  if(game==='vote'){
+    modes.setAttribute('aria-label','一票の遊び方');panel.before(modes);
+    button(modes,'投票する',()=>reset());button(modes,'得票率を予想',()=>openPolls('得票率を予想'));
+    button(modes,'接戦速報',()=>openPolls('接戦速報'));button(modes,'開票実験室',simulate);button(modes,'投票箱をつくる',ballotBox);
+  }
   reset();
 })();

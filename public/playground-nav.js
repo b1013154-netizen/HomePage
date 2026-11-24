@@ -2,7 +2,7 @@
   const path = location.pathname.replace(/\.html$/, '').replace(/\/$/, '').replace(/^\/index$/, '') || '/';
   const pages = [
     { url: '/', title: 'ホームページの遊び場', sub: 'すべての遊び場への入り口', icon: '⌂' },
-    {"url": "/last-vote", "title": "最後の一票は、あなたです", "sub": "5つの二択、あなたは多数派？", "icon": "✉"},
+    {"url": "/last-vote", "title": "最後の一票は、あなたです", "sub": "115の二択に投票。自分の投票箱も作れる", "icon": "✉"},
     {"url": "/my-measures", "title": "私の「すぐ行く」は何分後？", "sub": "自分の言葉のものさしを作る", "icon": "◷"},
     {"url": "/no-price", "title": "値札のない雑貨店", "sub": "不思議な品物に値段をつける", "icon": "￥"},
     {"url": "/holiday-council", "title": "存在しない祝日の制定会議", "sub": "自分だけの休日を制定する", "icon": "☀"},
