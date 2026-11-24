@@ -2,6 +2,13 @@
   const path = location.pathname.replace(/\.html$/, '').replace(/\/$/, '').replace(/^\/index$/, '') || '/';
   const pages = [
     { url: '/', title: 'ホームページの遊び場', sub: 'すべての遊び場への入り口', icon: '⌂' },
+    {"url": "/last-vote", "title": "最後の一票は、あなたです", "sub": "5つの二択、あなたは多数派？", "icon": "✉"},
+    {"url": "/my-measures", "title": "私の「すぐ行く」は何分後？", "sub": "自分の言葉のものさしを作る", "icon": "◷"},
+    {"url": "/no-price", "title": "値札のない雑貨店", "sub": "不思議な品物に値段をつける", "icon": "￥"},
+    {"url": "/holiday-council", "title": "存在しない祝日の制定会議", "sub": "自分だけの休日を制定する", "icon": "☀"},
+    {"url": "/seen-it", "title": "見たつもり選手権", "sub": "今日の喫茶店を5秒で覚える", "icon": "☕"},
+    {"url": "/take-one", "title": "一個だけ持って帰れる展", "sub": "思い出の展示からひとつ選ぶ", "icon": "◇"},
+    {"url": "/same-blue", "title": "同じ青を見つけた人", "sub": "情景を色で答え合わせする", "icon": "▦"},
     { url: '/scale-town', title: '縮尺が壊れた商店街', sub: '道路と店舗を配置して街を育てる', icon: '▤' },
     { url: '/future-museum', title: '現代のものを未来で展示すると', sub: '日用品を埋めて未来の3D博物館へ', icon: '◇' },
     { url: '/doodle-lab', title: '落書き生物の進化実験', sub: '描いた命と遊び、進化を観察', icon: '✎' },

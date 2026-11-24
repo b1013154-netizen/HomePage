@@ -2,7 +2,7 @@
   "name": "homepage",
   "main": "src/worker.js",
   "compatibility_date": "2026-11-11",
-  "assets": { "directory": "./public", "binding": "ASSETS", "run_worker_first": ["/api/visits"] },
+  "assets": { "directory": "./public", "binding": "ASSETS", "run_worker_first": ["/api/visits", "/api/quick-choice"] },
   "durable_objects": { "bindings": [{ "name": "VISITS", "class_name": "VisitCounter" }] },
   "migrations": [{ "tag": "visits-v1", "new_sqlite_classes": ["VisitCounter"] }]
 }

@@ -1,5 +1,7 @@
 import { DurableObject } from "cloudflare:workers";
 
+import { recordChoice } from "./quick-votes.js";
+
 const origins = new Set([
   "https://homepage.b1013154.workers.dev",
   "https://asobiba-lab-bsa.pages.dev",
@@ -8,7 +10,8 @@ const origins = new Set([
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    if (url.pathname !== "/api/visits") return env.ASSETS.fetch(request);
+    const isChoice = url.pathname === "/api/quick-choice";
+    if (!isChoice && url.pathname !== "/api/visits") return env.ASSETS.fetch(request);
     const origin = request.headers.get("Origin");
     const headers = { "Cache-Control": "no-store", "Vary": "Origin" };
     if (origin && !origins.has(origin)) return new Response("Forbidden", { status: 403, headers });
@@ -23,7 +26,7 @@ export default {
       return new Response("Method not allowed", { status: 405, headers });
     }
     try {
-      const counter = env.VISITS.get(env.VISITS.idFromName("playground-total"));
+      const counter = env.VISITS.get(env.VISITS.idFromName(isChoice ? "quick-choices-v1" : "playground-total"));
       const response = await counter.fetch(request);
       return new Response(response.body, { status: response.status,
         headers: { ...headers, "Content-Type": "application/json; charset=utf-8" } });
@@ -43,6 +46,7 @@ export class VisitCounter extends DurableObject {
   }
 
   async fetch(request) {
+    if (new URL(request.url).pathname === "/api/quick-choice") return recordChoice(request,this.ctx.storage);
     if (request.method === "POST") {
       if (Number(request.headers.get("Content-Length")) > 256) return new Response(null, { status: 413 });
       const { id } = await request.json();
