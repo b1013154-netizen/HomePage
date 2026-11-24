@@ -65,16 +65,16 @@
   function result(summary,details,again){
     textResult=summary+'\n'+details.filter(Boolean).join('\n');add('p',textResult,'ticket');
     const box=actions(),a=node('a','Xで結果を共有');const share=new URL('https://twitter.com/intent/tweet');
-    share.searchParams.set('text',title+'\n'+(game==='holiday'||game==='measure'?textResult:summary));share.searchParams.set('url','https://asobiba-lab-bsa.pages.dev'+location.pathname);
+    share.searchParams.set('text',title+'\n'+(activeExtra||game==='holiday'||game==='measure'?textResult:summary));share.searchParams.set('url',location.origin+location.pathname+(activeExtra?location.hash:''));
     a.href=share.href;a.target='_blank';a.rel='noopener';box.append(a);
-    button(box,'結果画像を保存',saveImage);button(box,again||'もう一度遊ぶ',reset);
+    button(box,'結果画像を保存',saveImage);button(box,again||'もう一度遊ぶ',()=>activeExtra?extra(true):reset());
   }
   function saveImage(){
     const canvas=document.createElement('canvas');canvas.width=1000;canvas.height=800;
     const ctx=canvas.getContext('2d');ctx.fillStyle='#f7f1df';ctx.fillRect(0,0,1000,800);ctx.fillStyle=getComputedStyle(document.body).getPropertyValue('--accent');ctx.fillRect(0,0,22,800);
     ctx.font='bold 38px sans-serif';ctx.fillText(title,60,88,880);ctx.font='30px sans-serif';ctx.fillStyle='#253e36';let y=178;
     for(const line of textResult.split('\n')){let row='';for(const ch of line){if(ctx.measureText(row+ch).width>850){ctx.fillText(row,60,y);y+=45;row=''}row+=ch}ctx.fillText(row,60,y);y+=54}
-    if(game==='color' && resultColor){ctx.fillStyle=resultColor;ctx.fillRect(60,450,880,145);ctx.fillStyle='#253e36'}
+    if(game==='color' && resultColor){if(pairColor){const gradient=ctx.createLinearGradient(60,0,940,0);gradient.addColorStop(0,pairColor);gradient.addColorStop(1,resultColor);ctx.fillStyle=gradient}else ctx.fillStyle=resultColor;ctx.fillRect(60,450,880,145);ctx.fillStyle='#253e36'}
     if(game==='holiday'){
       const now=new Date(),year=now.getFullYear(),month=now.getMonth(),first=new Date(year,month,1).getDay(),days=new Date(year,month+1,0).getDate();
       ctx.font='22px sans-serif';ctx.fillText(year+' 年 '+(month+1)+' 月',60,443);
@@ -177,6 +177,7 @@ const grid=add('div','','colors');let selected=-1;const pick=button(actions(),'�
     },'main');
   }
   function reset(first){
+    activeExtra=false; pairColor='';if(location.hash)history.replaceState(null,'',location.pathname);if(game!=='vote')markMode(classicNames[game]);
     revision++;clearInterval(timer);step=0;answers=[];reports=[];
     if(game==='vote'){
       markMode('投票する');deck=shuffled(indexes(votes).filter(i=>i!==first));
@@ -255,5 +256,100 @@ const grid=add('div','','colors');let selected=-1;const pick=button(actions(),'�
     button(modes,'投票する',()=>reset());button(modes,'得票率を予想',()=>openPolls('得票率を予想'));
     button(modes,'接戦速報',()=>openPolls('接戦速報'));button(modes,'開票実験室',simulate);button(modes,'投票箱をつくる',ballotBox);
   }
-  reset();
+  const extraNames={vote:'4票目を読みます',measure:'あなたの「すぐ」を当てます',price:'現物のお給料',holiday:'本日の休暇届',memory:'棚に戻す',exhibit:'忘れ物の引き出し',color:'色の伝言'};
+  const classicNames={measure:'言葉のものさし',price:'雑貨店で買い付け',holiday:'祝日を制定する',memory:'今日の観察クイズ',exhibit:'展示を巡る',color:'情景の色を選ぶ'};
+  const params=new URLSearchParams(location.hash.slice(1));
+  function invitation(data,message){
+    const url=new URL(location.pathname,location.origin);url.hash=new URLSearchParams(data).toString();
+    const box=actions(),a=node('a','Xで招待する');const share=new URL('https://twitter.com/intent/tweet');
+    share.searchParams.set('url',url.href);share.searchParams.set('text',message);a.href=share.href;a.target='_blank';a.rel='noopener';box.append(a);
+    button(box,'招待リンクをコピー',async()=>{try{await navigator.clipboard.writeText(url.href);add('p','コピーしました。','small')}catch{const field=add('input');field.value=url.href;field.readOnly=true;field.select()}});
+  }
+  function numberField(label,max){
+    const field=add('label',label+' '),input=node('input');input.type='number';input.required=true;input.min=0;input.max=max;input.step=1;field.append(input);return input;
+  }
+  const settings='休日の朝 旅先 放課後 雨の日 待ち合わせ前 初めての町 昼休み 仕事帰り 連休の初日 夏休み 冬の朝 引っ越しの翌日'.split(' ');
+  function prediction(){
+    const pace=game==='measure';
+    const pairs=pace?[
+      ['出発の支度は？','前日にそろえる','出る前にそろえる'],['通知が来たら？','すぐ開く','区切りまで待つ'],['駅に向かう道は？','いつもの近道','気になる路地'],['荷物の確認は？','玄関に行く前','靴を履いてから'],['店で注文するときは？','並ぶ前に決める','席に着いて考える'],['集合場所に向かうときは？','一本早い電車','ちょうどの電車'],['届け物を頼まれたら？','先に届ける','用事をまとめる'],['飲み物を選ぶなら？','いつもの一杯','メニューをじっくり'],['道に迷ったら？','すぐ尋ねる','少し歩いてみる'],['予定が決まったら？','その場で登録','あとで整理']
+    ]:[
+      ['ポストカードにするなら？','地元の商店街','知らない街角'],['食べに行くなら？','行きつけの定食屋','開店初日の食堂'],['写真を撮るなら？','いつもの景色','未踏の路地'],['列車を降りるなら？','馴染みの駅','初めての終点'],['本棚から取るなら？','好きな本を再読','初めての作家'],['一曲だけ聴くなら？','思い出の一曲','未知の新曲'],['喫茶店で選ぶなら？','定番ブレンド','本日の試作品'],['休日に歩くなら？','いつもの散歩道','地図で見つけた道'],['誰かと遊ぶなら？','得意なゲーム','初めてのゲーム'],['今夜見るなら？','大好きな映画','題名しか知らない映画']
+    ];
+    const round=shuffled(pairs,challengeRandom).slice(0,pace?5:4),contexts=shuffled(settings,challengeRandom);let i=0,score=0;
+    function ask(){
+      const [q,a,b]=round[i];start(0,contexts[i]+'。'+q);add('p',(i+1)+' / '+round.length,'step');
+      const guess=score>=2?b:a;
+      if(!pace&&i===3)add('p','私の予想は「'+guess+'」。最初の3票では'+(score>=2?'新しい体験':'馴染みのあるもの')+'を多く選びました。','ticket');
+      const choices=shuffled([a,b]);options(choices,j=>{
+        const picked=choices[j];score+=Number(picked===b);i++;
+        if(i<round.length)return ask();
+        if(!pace){start(0,picked===guess?'4票目、的中！':'予想を裏切る一票！');result('私の4票目は「'+picked+'」。',['遊び場の予想　'+guess]);return}
+        const minutes=3+3*score;start(0,'あなたの「すぐ」は '+minutes+' 分と予想！');
+        const actual=numberField('実際の感覚は何分？',120);button(actions(),'答え合わせ',()=>{if(!actual.reportValidity())return;const v=actual.valueAsNumber;start(0,'感覚の答え合わせ');result('私は「すぐ」を'+v+'分のつもりで言っています。',['ゲームの予想 '+minutes+'分 ／ 差 '+Math.abs(v-minutes)+'分'])});
+      });
+    }ask();
+  }
+  function salary(){
+    start(0,'今日の給料、現物でどうぞ');button(actions(),'封筒を開ける',()=>{
+      const [name,desc,icon]=shuffled(goods,challengeRandom)[0];start(0,name);add('div',icon,'art');add('p',desc);
+      function finish(line){start(0,'現物給与明細');result(name,[line])}
+      button(actions(),'持ち帰る',()=>finish('値段を付けずに持ち帰りました。'));
+      button(actions(),'値札を付けて売る',()=>{start(0,name);const amount=numberField('いくらで売りますか？（円）',1000000);button(actions(),'売却する',()=>{if(amount.reportValidity())finish(amount.valueAsNumber.toLocaleString()+'円で売却しました。')})});
+    });
+  }
+  function leave(){
+    const situations=['返事を何度も書き直した','時計を何度も見た','予定を詰めすぎた','仕事の通知を開いた','近道ばかりを探した','勝ち負けが気になった','頼まれごとを抱えた','明日の準備を急いだ','人と比べてしまった','一度も休憩しなかった'];
+    const exemptions=['返信はお茶のあとでいい','時計を伏せていい','予定をひとつ空けていい','通知を休ませていい','遠回りしていい','引き分けでいい','助けを頼んでいい','支度はあとでいい','自分の歩幅でいい','ひと休みしていい'];
+    const labels=settings.flatMap(s=>situations.map(v=>s+'、'+v));
+    function ticket(k){const title=exemptions[k%10]+'日';start(0,title);add('p','取得条件　'+labels[k],'ticket');
+      button(actions(),'この休暇を取得する',()=>{start(0,'本日の休暇届');add('p','取得済　「'+title+'」','ticket');invitation({leave:k},'今日は「'+title+'」。あなたも取得しますか？')});
+    }
+    const key=params.get('leave');if(key!==null&&/^\d+$/.test(key)&&+key<labels.length)return ticket(+key);
+    start(0,'今日は何を免除されたい？');browse(labels,ticket);
+  }
+  function shelves(){
+    const day=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Tokyo'}).format(new Date());let s=Number(day.replaceAll('-',''));
+    const rng=()=>((s=(Math.imul(s,1664525)+1013904223)>>>0)/4294967296);
+    const items=shuffled(inventory,rng).slice(0,6),targets=shuffled(indexes(items),rng).slice(0,3);let turn=0,points=0;
+    const spots=['左上','上の中央','右上','左下','下の中央','右下'];
+    function shelf(full){const grid=add('div','','shelf');return items.map(([icon,name],j)=>{const cell=node('button',full?icon+' '+name:spots[j]);grid.append(cell);cell.disabled=full;return cell})}
+    function ask(){const k=targets[turn];start(0,items[k][1]+'を元の場所に戻して');const piece=add('button',items[k].join(' '),'piece');piece.draggable=true;piece.ondragstart=e=>e.dataTransfer.setData('text/plain','piece');
+      add('p','ドラッグするか、置きたい場所をタップ。','small');const cells=shelf(false);
+      function drop(j){start(0,j===k?'ぴったり！':'正解は'+spots[k]);points+=Number(j===k);const reveal=shelf(turn===2);reveal.forEach(cell=>cell.disabled=true);reveal[k].textContent=items[k].join(' ');reveal[k].classList.add('correct');reveal[j].classList.add('placed');button(actions(),turn===2?'結果を見る':'次の品へ',()=>{if(++turn<3)ask();else{start(0,'今日の棚戻し');result(day+' の棚戻し '+points+' / 3',[])}})}
+      piece.onpointerdown=e=>{if(e.pointerType!=='mouse')piece.setPointerCapture(e.pointerId)};piece.onpointerup=e=>{if(e.pointerType==='mouse')return;const tile=document.elementFromPoint(e.clientX,e.clientY);const j=cells.indexOf(tile);if(j>=0)drop(j)};cells.forEach((el,j)=>{el.onclick=()=>drop(j);el.ondragover=e=>e.preventDefault();el.ondrop=e=>{e.preventDefault();drop(j)}})
+    }
+    start(0,'棚に戻す');button(actions(),'棚を5秒見る',()=>{start(0,'6つの場所を覚えて');shelf(true);timer=setTimeout(ask,5000)});
+  }
+  function drawers(){
+    const order=shuffled(exhibits,challengeRandom);let i=0;
+    function open(){const item=order[i];start(0,'引き出し '+(i+1));add('p',item,'drawer-item');
+      button(actions(),'持ち帰る',()=>{start(0,'忘れ物の引換券');result('持ち帰ったのは「'+item+'」。',['開けた引き出し '+(i+1)+' 個'])});
+      if(i+1<order.length)button(actions(),'置いて次を開ける',()=>{i++;open()});
+      button(actions(),'情景の音を聴く',async()=>{
+        const ctx=new AudioContext();try{await ctx.resume();const notes=item.includes('声')?[330,440,392]:item.includes('雨')?[760,680,520]:[220,330,494];
+        notes.forEach((f,j)=>{const osc=ctx.createOscillator(),g=ctx.createGain(),t=ctx.currentTime+j*.28;osc.frequency.value=f;g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.09,t+.05);g.gain.exponentialRampToValueAtTime(.001,t+.8);osc.connect(g).connect(ctx.destination);osc.start(t);osc.stop(t+.85)});await new Promise(r=>setTimeout(r,1700))}finally{await ctx.close()}});
+    }
+    start(0,'忘れ物保管所');add('p','持ち帰れるのは一品。次を開けると、前の引き出しには戻れません。');button(actions(),'引き出しを開ける',open);
+  }
+  function colorMessage(){
+    const key=params.get('ink'),hint=(params.get('hint')||'').slice(0,80),guest=key!==null&&/^\d+$/.test(key)&&+key<colors.length&&hint.trim();
+    start(0,guest?'ヒントから色を選んで':'何色か、言葉で伝えよう');if(guest)add('p',hint,'ticket');
+    function pick(fn){const grid=add('div','','colors');colors.forEach((c,i)=>{const b=button(grid,'',()=>fn(i));b.style.background=c;b.setAttribute('aria-label','色 '+(i+1))})}
+    pick(i=>{if(guest){start(0,'ふたりの色切符');const ticket=add('div',hint,'sky-ticket');ticket.style.background='linear-gradient(100deg,'+colors[+key]+','+colors[i]+')';resultColor=colors[i];pairColor=colors[+key];result(+key===i?'同じ色を選びました！':'ひとつの言葉から、ふたつの色。',['ヒント　'+hint,'出題者 #'+(+key+1)+' ／ あなた #'+(i+1)]);return}
+      start(0,'この色を言葉にすると？');add('div','','swatch').style.background=colors[i];const field=add('input');field.maxLength=80;field.placeholder='例　プールから帰る道';field.setAttribute('aria-label','色名を使わずにヒントを入力');
+      button(actions(),'招待状を作る',()=>{if(!field.value.trim()){field.focus();return}const h=field.value.trim();start(0,'色の招待状');add('p',h,'ticket');invitation({ink:i,hint:h},'この言葉、あなたならどんな色？「'+h+'」')})
+    });
+  }
+  let activeExtra=false,pairColor='',challengeRandom=Math.random;
+  function extra(fresh=false){
+    activeExtra=true;pairColor='';
+    if(fresh===true){params.delete('ink');params.delete('hint');params.delete('leave');params.delete('seed')}
+    const seed=/^[0-9]{1,10}$/.test(params.get('seed'))?Number(params.get('seed')):crypto.getRandomValues(new Uint32Array(1))[0];
+    params.set('seed',seed);params.set('play','extra');history.replaceState(null,'','#'+params);
+    let state=seed;challengeRandom=()=>((state=(Math.imul(state,1664525)+1013904223)>>>0)/4294967296);
+    revision++;clearInterval(timer);markMode(extraNames[game]);({vote:prediction,measure:prediction,price:salary,memory:shelves,holiday:leave,exhibit:drawers,color:colorMessage})[game]()}
+  if(game!=='vote'){modes.setAttribute('aria-label','遊び方');panel.before(modes);button(modes,classicNames[game],()=>{history.replaceState(null,'',location.pathname);params.delete('leave');params.delete('ink');reset();markMode(classicNames[game])})}
+  button(modes,extraNames[game],extra);
+  if(game==='vote'&&params.get('play')!=='extra')reset();else extra();
 })();
