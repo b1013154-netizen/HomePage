@@ -2,6 +2,16 @@
   const path = location.pathname.replace(/\.html$/, '').replace(/\/$/, '').replace(/^\/index$/, '') || '/';
   const pages = [
     { url: '/', title: 'ホームページの遊び場', sub: 'すべての遊び場への入り口', icon: '⌂' },
+    {"url":"/hold-this","title":"「ちょっと持ってて」の限界","sub":"左右の手に友達の荷物を積む","icon":"👐"},
+    {"url":"/memory-exit","title":"うろ覚え非常口","sub":"記憶を頼りに避難案内を組み立てる","icon":"🚪"},
+    {"url":"/clap-hall","title":"あなたの拍手、何人分？","sub":"3秒の拍手を客席で再演","icon":"👏"},
+    {"url":"/last-gyoza","title":"最後の一口、誰が取る？","sub":"最後の餃子をめぐる四コマ","icon":"🥟"},
+    {"url":"/lost-announcement","title":"一行だけの落とし物放送","sub":"自分のヒントで友達を呼び出す","icon":"📣"},
+    {"url":"/late-bag","title":"寝坊した朝の持ち物検査","sub":"8秒で部屋から荷物をつかむ","icon":"🎒"},
+    {"url":"/sound-floor","title":"その音、何階に住んでる？","sub":"暮らしの音を聴いて部屋を当てる","icon":"🏢"},
+    {"url":"/habit-island","title":"手癖でできた島","sub":"一筆で島を描き友達に港を託す","icon":"🏝️"},
+    {"url":"/one-spoon","title":"そこまでが「一口」ですか","sub":"二人のスプーンの跡を重ねる","icon":"🍮"},
+    {"url":"/daily-credits","title":"エンドロールに載せるなら","sub":"今日の出来事を一本のエンドロールへ","icon":"🎞️"},
     {"url": "/last-vote", "title": "最後の一票は、あなたです", "sub": "115の二択に投票。自分の投票箱も作れる", "icon": "✉"},
     {"url": "/my-measures", "title": "私の「すぐ行く」は何分後？", "sub": "自分の言葉のものさしを作る", "icon": "◷"},
     {"url": "/no-price", "title": "値札のない雑貨店", "sub": "不思議な品物に値段をつける", "icon": "￥"},
