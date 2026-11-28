@@ -334,9 +334,11 @@ const grid=add('div','','colors');let selected=-1;const pick=button(actions(),'�
   }
   function colorMessage(){
     const key=params.get('ink'),hint=(params.get('hint')||'').slice(0,80),guest=key!==null&&/^\d+$/.test(key)&&+key<colors.length&&hint.trim();
+    function pair(other){start(0,'ふたりの色切符');const ticket=add('div',hint,'sky-ticket');ticket.style.background='linear-gradient(100deg,'+colors[+key]+','+colors[other]+')';resultColor=colors[other];pairColor=colors[+key];params.set('pair',other);history.replaceState(null,'','#'+params);result(+key===other?'同じ色を選びました！':'ひとつの言葉から、ふたつの色。',['ヒント　'+hint,'出題者 #'+(+key+1)+' ／ あなた #'+(other+1)]);panel.querySelector('a').textContent='二人の結果を返す';button(actions(),'別の友達に出題する',()=>{start(0,'色の招待状');invitation({ink:key,hint},hint)})}
+    if(guest&&/^\d+$/.test(params.get('pair'))&&+params.get('pair')<colors.length)return pair(+params.get('pair'));
     start(0,guest?'ヒントから色を選んで':'何色か、言葉で伝えよう');if(guest)add('p',hint,'ticket');
     function pick(fn){const grid=add('div','','colors');colors.forEach((c,i)=>{const b=button(grid,'',()=>fn(i));b.style.background=c;b.setAttribute('aria-label','色 '+(i+1))})}
-    pick(i=>{if(guest){start(0,'ふたりの色切符');const ticket=add('div',hint,'sky-ticket');ticket.style.background='linear-gradient(100deg,'+colors[+key]+','+colors[i]+')';resultColor=colors[i];pairColor=colors[+key];result(+key===i?'同じ色を選びました！':'ひとつの言葉から、ふたつの色。',['ヒント　'+hint,'出題者 #'+(+key+1)+' ／ あなた #'+(i+1)]);return}
+    pick(i=>{if(guest)return pair(i);
       start(0,'この色を言葉にすると？');add('div','','swatch').style.background=colors[i];const field=add('input');field.maxLength=80;field.placeholder='例　プールから帰る道';field.setAttribute('aria-label','色名を使わずにヒントを入力');
       button(actions(),'招待状を作る',()=>{if(!field.value.trim()){field.focus();return}const h=field.value.trim();start(0,'色の招待状');add('p',h,'ticket');invitation({ink:i,hint:h},'この言葉、あなたならどんな色？「'+h+'」')})
     });
@@ -351,5 +353,5 @@ const grid=add('div','','colors');let selected=-1;const pick=button(actions(),'�
     revision++;clearInterval(timer);markMode(extraNames[game]);({vote:prediction,measure:prediction,price:salary,memory:shelves,holiday:leave,exhibit:drawers,color:colorMessage})[game]()}
   if(game!=='vote'){modes.setAttribute('aria-label','遊び方');panel.before(modes);button(modes,classicNames[game],()=>{history.replaceState(null,'',location.pathname);params.delete('leave');params.delete('ink');reset();markMode(classicNames[game])})}
   button(modes,extraNames[game],extra);
-  if(game==='vote'&&params.get('play')!=='extra')reset();else extra();
+  if(game==='vote'&&params.has('daily')){const day=new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Tokyo'});reset(Math.floor(Date.parse(day)/86400000)%votes.length)}else if(game==='vote'&&params.get('play')!=='extra')reset();else extra();
 })();

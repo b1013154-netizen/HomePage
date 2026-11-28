@@ -2,6 +2,10 @@
   const path = location.pathname.replace(/\.html$/, '').replace(/\/$/, '').replace(/^\/index$/, '') || '/';
   const pages = [
     { url: '/', title: 'ホームページの遊び場', sub: 'すべての遊び場への入り口', icon: '⌂' },
+    {"url": "/postcard", "title": "消印のない絵はがき", "sub": "言葉だけで旅先の絵を復元", "icon": "✉"},
+    {"url": "/detective", "title": "閉店後のレシート探偵", "sub": "日替わりの事件を一か所の調査で推理", "icon": "☕"},
+    {"url": "/future", "title": "昨日の自分からの出題", "sub": "未来の自分の答えを封印", "icon": "✎"},
+    {"url": "/expo", "title": "遊び場の小さな万博", "sub": "島と曲を合わせて小さな展示を開く", "icon": "⚑"},
     {"url":"/hold-this","title":"「ちょっと持ってて」の限界","sub":"左右の手に友達の荷物を積む","icon":"👐"},
     {"url":"/memory-exit","title":"うろ覚え非常口","sub":"記憶を頼りに避難案内を組み立てる","icon":"🚪"},
     {"url":"/clap-hall","title":"あなたの拍手、何人分？","sub":"3秒の拍手を客席で再演","icon":"👏"},
@@ -31,6 +35,10 @@
     { url: '/hoshizora', title: 'HOSHIZORA', sub: '世界の88星座をめぐる図鑑', icon: '✧' },
     { url: '/planetarium', title: '全天プラネタリウム', sub: 'HOSHIZORA · 118,216個の星を探検', icon: '◌' }
   ];
+  const together=new Set('postcard clap-hall lost-announcement habit-island one-spoon same-blue my-measures last-vote'.split(' '));
+  const studio=new Set('expo scale-town future-museum doodle-lab little-planet invention character music-stairs draw-card battle hoshizora planetarium'.split(' '));
+  const groups=['すぐ遊ぶ','誰かと比べる','じっくり作る・探索する'];
+  const groupOf=url=>studio.has(url.slice(1))?2:together.has(url.slice(1))?1:0;
   if (path !== '/' && pages.some(p => p.url === path)) {
     try {
       const previous = JSON.parse(localStorage.getItem('playground.recent.v1') || '[]');
@@ -50,7 +58,7 @@
   drawer.id = 'pg-drawer';
   drawer.className = 'pg-drawer';
   drawer.setAttribute('aria-labelledby', 'pg-drawer-title');
-  drawer.innerHTML = `<div class="pg-drawer-top"><span>PLAYGROUND / MENU</span><button type="button" class="pg-close" aria-label="メニューを閉じる">×</button></div><h2 id="pg-drawer-title">ホームページの<br>遊び場</h2><p class="pg-drawer-intro">今日は、どこで遊ぼう。</p><nav class="pg-links" aria-label="遊び場のページ">${pages.map(page => `<a href="${page.url}" ${path === page.url ? 'aria-current="page"' : ''}><span class="pg-link-icon" aria-hidden="true">${page.icon}</span><span><strong>${page.title}</strong><small>${page.sub}</small></span><span aria-hidden="true">${path === page.url ? '●' : '↗'}</span></a>`).join('')}</nav><p class="pg-drawer-bottom">小さな好奇心から、ひろがる世界。</p>`;
+  drawer.innerHTML = `<div class="pg-drawer-top"><span>PLAYGROUND / MENU</span><button type="button" class="pg-close" aria-label="メニューを閉じる">×</button></div><h2 id="pg-drawer-title">ホームページの<br>遊び場</h2><p class="pg-drawer-intro">今日は、どこで遊ぼう。</p><nav class="pg-links" aria-label="遊び場のページ">${groups.map((name,i)=>'<h3>'+name+'</h3>'+pages.filter(p=>p.url!=='/'&&groupOf(p.url)===i).map(page => `<a href="${page.url}" ${path === page.url ? 'aria-current="page"' : ''}><span class="pg-link-icon" aria-hidden="true">${page.icon}</span><span><strong>${page.title}</strong><small>${page.sub}</small></span><span aria-hidden="true">${path === page.url ? '●' : '↗'}</span></a>`).join('')).join('')}<a href="/">遊び場のトップへ</a></nav><p class="pg-drawer-bottom">小さな好奇心から、ひろがる世界。</p>`;
   document.body.append(button, drawer);
   button.addEventListener('click', () => {
     drawer.showModal();

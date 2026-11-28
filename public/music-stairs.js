@@ -143,6 +143,6 @@ $('vocal-style').onchange=()=>change(()=>{
 $('site-origin').textContent=location.origin;
 $('song-engine').onchange=()=>{stop();vocalSettings().engine=$('song-engine').value;syncExtras();$('vv-help').open=!$('vv-help').hidden;};
 song.singing={on:false,voice:0,theme:7,text:'よるのまちに\nきみのこえがひびく',reading:''};
-sync();shelf();
+sync();shelf();if(location.hash==='#latest'&&library.length){$('library').value='0';$('load').click()}
 })();
 
